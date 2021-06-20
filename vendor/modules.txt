@@ -1,0 +1,6 @@
+# github.com/imdario/mergo v0.3.12
+## explicit
+github.com/imdario/mergo
+# github.com/jlaffaye/ftp v0.0.0-20210307004419-5d4190119067
+## explicit
+github.com/jlaffaye/ftp
