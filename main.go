@@ -322,7 +322,7 @@ func updateMap(calls *map[string]HamCall, hc *HamCall, call string) {
 func WriteCall(data *HamCall) {
 	// fmt.Print(data.Callsign, " ")
 	call := strings.Replace(data.Callsign, "/", "", -1)
-	path := "calls/" + string(call[0]) + "/" + string(call[1]) + "/" + string(call[2]) + "/" + string(call[3])
+	path := "calls/" + string(call[0]) + "/" + string(call[1]) + "/" + string(call[2])
 	filename := path + "/" + call + ".json"
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
 		os.MkdirAll(path, 0700)
