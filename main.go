@@ -55,17 +55,18 @@ func main() {
 	fmt.Println("Unzipped:\n" + strings.Join(files, "\n"))
 
 	calls := make(map[string]HamCall)
+	var wg2 sync.WaitGroup
 
-	wg.Add(1)
-	go ProcessAM(&calls, &wg)
+	wg2.Add(1)
+	go ProcessAM(&calls, &wg2)
 
-	wg.Add(1)
-	go ProcessEN(&calls, &wg)
+	wg2.Add(1)
+	go ProcessEN(&calls, &wg2)
 
-	wg.Add(1)
-	go ProcessLOTW(&calls, &wg)
+	wg2.Add(1)
+	go ProcessLOTW(&calls, &wg2)
 
-	wg.Wait()
+	wg2.Wait()
 
 	for _, v := range calls {
 		WriteCall(&v)
@@ -330,4 +331,5 @@ func WriteCall(data *HamCall) {
 	if err != nil {
 		fmt.Println(err)
 	}
+
 }
