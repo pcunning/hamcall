@@ -57,13 +57,13 @@ func main() {
 	calls := make(map[string]HamCall)
 
 	wg.Add(1)
-	go ProcessAM(&calls, &wg)
+	ProcessAM(&calls, &wg)
 
 	wg.Add(1)
-	go ProcessEN(&calls, &wg)
+	ProcessEN(&calls, &wg)
 
 	wg.Add(1)
-	go ProcessLOTW(&calls, &wg)
+	ProcessLOTW(&calls, &wg)
 
 	wg.Wait()
 
@@ -227,7 +227,7 @@ func ProcessAM(calls *map[string]HamCall, wg *sync.WaitGroup) {
 			Class:    record[5],
 		}
 
-		fmt.Print("AM-", record[4], " ")
+		// fmt.Print("AM-", record[4], " ")
 		updateMap(calls, &hc, record[4])
 	}
 }
@@ -266,7 +266,7 @@ func ProcessEN(calls *map[string]HamCall, wg *sync.WaitGroup) {
 			Zip:      record[18],
 		}
 
-		fmt.Print("EN-", record[4], " ")
+		// fmt.Print("EN-", record[4], " ")
 		updateMap(calls, &hc, record[4])
 	}
 
@@ -319,7 +319,7 @@ func updateMap(calls *map[string]HamCall, hc *HamCall, call string) {
 }
 
 func WriteCall(data *HamCall) {
-	fmt.Print(data.Callsign, " ")
+	// fmt.Print(data.Callsign, " ")
 
 	filename := "calls/" + strings.Replace(data.Callsign, "/", "", -1) + ".json"
 	file, _ := json.Marshal(data)
