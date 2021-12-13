@@ -38,39 +38,38 @@ type HamCall struct {
 
 func main() {
 
-	var wg sync.WaitGroup
+	// var wg sync.WaitGroup
 
-	wg.Add(1)
-	go DownloadFile("lotw.csv", "https://lotw.arrl.org/lotw-user-activity.csv", &wg)
+	// wg.Add(1)
+	// go DownloadFile("lotw.csv", "https://lotw.arrl.org/lotw-user-activity.csv", &wg)
 
-	wg.Add(1)
-	go DownloadFTPFile("amat.zip", "ftp://wirelessftp.fcc.gov:21/pub/uls/complete/l_amat.zip", &wg)
+	// wg.Add(1)
+	// go DownloadFTPFile("amat.zip", "ftp://wirelessftp.fcc.gov:21/pub/uls/complete/l_amat.zip", &wg)
 
-	wg.Wait()
+	// wg.Wait()
 
-	files, err := Unzip("amat.zip", "amat")
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("Unzipped:\n" + strings.Join(files, "\n"))
+	// files, err := Unzip("amat.zip", "amat")
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// fmt.Println("Unzipped:\n" + strings.Join(files, "\n"))
 
-	calls := make(map[string]HamCall)
-	var wg2 sync.WaitGroup
+	// calls := make(map[string]HamCall)
 
-	wg2.Add(1)
-	go ProcessAM(&calls, &wg2)
+	// wg.Add(1)
+	// go ProcessAM(&calls, &wg)
 
-	wg2.Add(1)
-	go ProcessEN(&calls, &wg2)
+	// wg.Add(1)
+	// go ProcessEN(&calls, &wg)
 
-	wg2.Add(1)
-	go ProcessLOTW(&calls, &wg2)
+	// wg.Add(1)
+	// go ProcessLOTW(&calls, &wg)
 
-	wg2.Wait()
+	// wg.Wait()
 
-	for _, v := range calls {
-		WriteCall(&v)
-	}
+	// for _, v := range calls {
+	// 	WriteCall(&v)
+	// }
 
 }
 
@@ -203,10 +202,16 @@ func ProcessAM(calls *map[string]HamCall, wg *sync.WaitGroup) {
 
 	fmt.Println("processing AM")
 
-	r, err := OpenFCCFile("amat/AM.dat")
+	f, err := os.Open("amat/AM.dat")
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
+	defer f.Close()
+
+	r := csv.NewReader(f)
+	r.Comma = '|'
+	r.LazyQuotes = true
+	r.FieldsPerRecord = -1
 
 	for {
 		record, err := r.Read()
@@ -232,10 +237,16 @@ func ProcessEN(calls *map[string]HamCall, wg *sync.WaitGroup) {
 
 	fmt.Println("processing EN")
 
-	r, err := OpenFCCFile("amat/EN.dat")
+	f, err := os.Open("amat/EN.dat")
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
+	defer f.Close()
+
+	r := csv.NewReader(f)
+	r.Comma = '|'
+	r.LazyQuotes = true
+	r.FieldsPerRecord = -1
 
 	for {
 		record, err := r.Read()
@@ -291,21 +302,6 @@ func ProcessLOTW(calls *map[string]HamCall, wg *sync.WaitGroup) {
 		}
 		updateMap(calls, &hc, record[0])
 	}
-}
-
-func OpenFCCFile(filename string) (*csv.Reader, error) {
-	f, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	r := csv.NewReader(f)
-	r.Comma = '|'
-	r.LazyQuotes = true
-	r.FieldsPerRecord = -1
-
-	return r, nil
 }
 
 func updateMap(calls *map[string]HamCall, hc *HamCall, call string) {
