@@ -40,19 +40,19 @@ func main() {
 
 	var wg sync.WaitGroup
 
-	// wg.Add(1)
-	// go DownloadFile("lotw.csv", "https://lotw.arrl.org/lotw-user-activity.csv", &wg)
+	wg.Add(1)
+	go DownloadFile("lotw.csv", "https://lotw.arrl.org/lotw-user-activity.csv", &wg)
 
-	// wg.Add(1)
-	// go DownloadFTPFile("amat.zip", "ftp://wirelessftp.fcc.gov:21/pub/uls/complete/l_amat.zip", &wg)
+	wg.Add(1)
+	go DownloadFTPFile("amat.zip", "ftp://wirelessftp.fcc.gov:21/pub/uls/complete/l_amat.zip", &wg)
 
-	// wg.Wait()
+	wg.Wait()
 
-	// files, err := Unzip("amat.zip", "amat")
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// fmt.Println("Unzipped:\n" + strings.Join(files, "\n"))
+	files, err := Unzip("amat.zip", "amat")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Unzipped:\n" + strings.Join(files, "\n"))
 
 	calls := make(map[string]HamCall)
 
@@ -67,6 +67,7 @@ func main() {
 
 	wg.Wait()
 
+	fmt.Printf("Writing %d files to disk\n", len(calls))
 	for _, v := range calls {
 		WriteCall(&v)
 	}
