@@ -21,14 +21,19 @@ import (
 )
 
 type HamCall struct {
-	Callsign string `json:"callsign"`
-	Name     string `json:"name"`
-	Class    string `json:"class"`
-	Address  string `json:"address"`
-	City     string `json:"city"`
-	State    string `json:"state"`
-	Zip      string `json:"zip"`
-	LOTW     string `json:"last_lotw"`
+	Callsign   string `json:"callsign"`
+	Name       string `json:"name"`
+	Class      string `json:"class"`
+	Address    string `json:"address"`
+	City       string `json:"city"`
+	State      string `json:"state"`
+	Zip        string `json:"zip"`
+	Grant      string `json:"grant"`
+	Effective  string `json:"effective"`
+	Expiration string `json:"expiration"`
+	FRN        string `json:"frn"`
+	FileNumber string `json:"file_number"`
+	LOTW       string `json:"last_lotw"`
 }
 
 func main() {
@@ -49,16 +54,29 @@ func main() {
 	}
 	fmt.Println("Unzipped:\n" + strings.Join(files, "\n"))
 
-	ProcessAM()
-	ProcessEN()
-	ProcessLOTW()
+	calls := make(map[string]HamCall)
+
+	wg.Add(1)
+	go ProcessAM(&calls, &wg)
+
+	wg.Add(1)
+	go ProcessEN(&calls, &wg)
+
+	wg.Add(1)
+	go ProcessLOTW(&calls, &wg)
+
+	wg.Wait()
+
+	for _, v := range calls {
+		WriteCall(&v)
+	}
 
 }
 
-// DownloadFile will download a url to a local file. It's efficient because it will
-// write as it downloads and not load the whole file into memory.
-// From https://golangcode.com/download-a-file-from-a-url/
 func DownloadFile(filepath string, u string, wg *sync.WaitGroup) {
+	// DownloadFile will download a url to a local file. It's efficient because it will
+	// write as it downloads and not load the whole file into memory.
+	// From https://golangcode.com/download-a-file-from-a-url/
 	defer wg.Done()
 
 	// Get the data
@@ -120,10 +138,10 @@ func DownloadFTPFile(filepath string, u string, wg *sync.WaitGroup) {
 	}
 }
 
-// Unzip will decompress a zip archive, moving all files and folders
-// within the zip file (parameter 1) to an output directory (parameter 2).
-// https://golangcode.com/unzip-files-in-go/
 func Unzip(src string, dest string) ([]string, error) {
+	// Unzip will decompress a zip archive, moving all files and folders
+	// within the zip file (parameter 1) to an output directory (parameter 2).
+	// https://golangcode.com/unzip-files-in-go/
 
 	var filenames []string
 
@@ -179,22 +197,16 @@ func Unzip(src string, dest string) ([]string, error) {
 	return filenames, nil
 }
 
-func ProcessAM() {
+func ProcessAM(calls *map[string]HamCall, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	fmt.Println("processing AM")
 
-	f, err := os.Open("amat/AM.dat")
+	r, err := OpenFCCFile("amat/AM.dat")
 	if err != nil {
-		fmt.Println(err)
-		return
+		log.Fatal(err)
 	}
-	defer f.Close()
 
-	r := csv.NewReader(f)
-	r.Comma = '|'
-	r.LazyQuotes = true
-	r.FieldsPerRecord = -1
-
-	i := 1
 	for {
 		record, err := r.Read()
 		if err == io.EOF {
@@ -204,35 +216,26 @@ func ProcessAM() {
 			break
 		}
 
-		OpenUpdateCall(&HamCall{
+		hc := HamCall{
 			Callsign: record[4],
 			Class:    record[5],
-		})
-
-		if i%1000 == 1 {
-			fmt.Printf(".")
 		}
-		i++
+
+		fmt.Print("AM-", record[4], " ")
+		updateMap(calls, &hc, record[4])
 	}
 }
 
-func ProcessEN() {
+func ProcessEN(calls *map[string]HamCall, wg *sync.WaitGroup) {
+	defer wg.Done()
 
 	fmt.Println("processing EN")
 
-	f, err := os.Open("amat/EN.dat")
+	r, err := OpenFCCFile("amat/EN.dat")
 	if err != nil {
-		fmt.Println(err)
-		return
+		log.Fatal(err)
 	}
-	defer f.Close()
 
-	r := csv.NewReader(f)
-	r.Comma = '|'
-	r.LazyQuotes = true
-	r.FieldsPerRecord = -1
-
-	i := 1
 	for {
 		record, err := r.Read()
 		if err == io.EOF {
@@ -242,26 +245,25 @@ func ProcessEN() {
 			break
 		}
 
-		OpenUpdateCall(&HamCall{
+		hc := HamCall{
 			Callsign: record[4],
 			Name:     record[7],
 			Address:  record[15],
 			City:     record[16],
 			State:    record[17],
 			Zip:      record[18],
-		})
-
-		if i%1000 == 1 {
-			fmt.Printf(".")
 		}
-		i++
+
+		fmt.Print("EN-", record[4], " ")
+		updateMap(calls, &hc, record[4])
 	}
 
 }
 
-func ProcessLOTW() {
+func ProcessLOTW(calls *map[string]HamCall, wg *sync.WaitGroup) {
+	defer wg.Done()
 
-	fmt.Println("processing EN")
+	fmt.Println("processing LOTW")
 
 	f, err := os.Open("lotw.csv")
 	if err != nil {
@@ -273,7 +275,6 @@ func ProcessLOTW() {
 	r := csv.NewReader(f)
 	r.FieldsPerRecord = -1
 
-	i := 1
 	for {
 		record, err := r.Read()
 		if err == io.EOF {
@@ -283,39 +284,50 @@ func ProcessLOTW() {
 			break
 		}
 
-		OpenUpdateCall(&HamCall{
+		hc := HamCall{
 			Callsign: record[0],
 			LOTW:     record[1] + record[2],
-		})
-
-		if i%1000 == 1 {
-			fmt.Printf(".")
 		}
-		i++
+		updateMap(calls, &hc, record[0])
 	}
 }
 
-func OpenUpdateCall(data *HamCall) {
-	var hc HamCall
-
-	filename := "calls/" + data.Callsign + ".json"
-	jsonFile, err := os.Open(filename)
+func OpenFCCFile(filename string) (*csv.Reader, error) {
+	f, err := os.Open(filename)
 	if err != nil {
-		// fmt.Println(err)
-	} else {
-		defer jsonFile.Close()
-		byteValue, _ := ioutil.ReadAll(jsonFile)
-		json.Unmarshal(byteValue, &hc)
+		return nil, err
+	}
+	defer f.Close()
+
+	r := csv.NewReader(f)
+	r.Comma = '|'
+	r.LazyQuotes = true
+	r.FieldsPerRecord = -1
+
+	return r, nil
+}
+
+func updateMap(calls *map[string]HamCall, hc *HamCall, call string) {
+	// this isn't thread safe right now
+
+	// if it exists merge with current record
+	_, c := (*calls)[call]
+	if c {
+		if err := mergo.Merge(&hc, (*calls)[call]); err != nil {
+			fmt.Printf("Error Merging: %v", err)
+		}
 	}
 
-	if err := mergo.Merge(&hc, data); err != nil {
+	(*calls)[hc.Callsign] = *hc
+}
+
+func WriteCall(data *HamCall) {
+	fmt.Print(data.Callsign, " ")
+
+	filename := "calls/" + strings.Replace(data.Callsign, "/", "", -1) + ".json"
+	file, _ := json.Marshal(data)
+	err := ioutil.WriteFile(filename, file, 0644)
+	if err != nil {
 		fmt.Println(err)
 	}
-
-	file, _ := json.Marshal(hc)
-	err = ioutil.WriteFile(filename, file, 0644)
-	if err != nil {
-		fmt.Println(err)
-	}
-
 }
