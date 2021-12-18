@@ -14,9 +14,11 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/imdario/mergo"
@@ -27,11 +29,15 @@ import (
 type HamCall struct {
 	Callsign   string `json:"callsign"`
 	Name       string `json:"name"`
+	FirstName  string `json:"first_name"`
+	Mi         string `json:"mi"`
+	LastName   string `json:"last_name"`
 	Class      string `json:"class"`
 	Address    string `json:"address"`
 	City       string `json:"city"`
 	State      string `json:"state"`
 	Zip        string `json:"zip"`
+	PoBox      string `json:"po_box"`
 	Grant      string `json:"grant"`
 	Effective  string `json:"effective"`
 	Expiration string `json:"expiration"`
@@ -44,6 +50,12 @@ type HamCall struct {
 type HashTable map[string]string
 
 func main() {
+
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	done := make(chan bool, 1)
+
+	start := time.Now()
 
 	keyID := os.Getenv("B2_KEYID")
 	applicationKey := os.Getenv("B2_APPKEY")
@@ -65,54 +77,77 @@ func main() {
 		ht = make(HashTable)
 	}
 
-	fmt.Printf("%d entries in hash table\n", len(ht))
+	go func() {
+		<-sigs
+		done <- true
+	}()
 
-	var wg sync.WaitGroup
+	go func() {
+		fmt.Println(time.Since(start))
+		fmt.Printf("%d entries in hash table\n", len(ht))
 
-	// wg.Add(1)
-	// go DownloadFile("lotw.csv", "https://lotw.arrl.org/lotw-user-activity.csv", &wg)
+		var wg sync.WaitGroup
 
-	// wg.Add(1)
-	// go DownloadFile("dmrid.dat", "https://www.radioid.net/static/dmrid.dat", &wg)
+		// wg.Add(1)
+		// go DownloadFile("lotw.csv", "https://lotw.arrl.org/lotw-user-activity.csv", &wg)
 
-	// wg.Add(1)
-	// go DownloadFTPFile("amat.zip", "ftp://wirelessftp.fcc.gov:21/pub/uls/complete/l_amat.zip", &wg)
+		// wg.Add(1)
+		// go DownloadFile("dmrid.dat", "https://www.radioid.net/static/dmrid.dat", &wg)
 
-	// wg.Wait()
+		// wg.Add(1)
+		// go DownloadFTPFile("amat.zip", "ftp://wirelessftp.fcc.gov:21/pub/uls/complete/l_amat.zip", &wg)
 
-	// files, err := Unzip("amat.zip", "amat")
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// fmt.Println("Unzipped:\n" + strings.Join(files, "\n"))
+		// wg.Wait()
 
-	calls := make(map[string]HamCall)
+		// fmt.Println(time.Since(start))
+		// files, err := Unzip("amat.zip", "amat")
+		// if err != nil {
+		// 	log.Fatal(err)
+		// }
+		// fmt.Println("Unzipped:\n" + strings.Join(files, "\n"))
 
-	wg.Add(1)
-	ProcessAM(&calls, &wg)
+		calls := make(map[string]HamCall)
 
-	wg.Add(1)
-	ProcessEN(&calls, &wg)
+		wg.Add(1)
+		fmt.Println(time.Since(start))
+		ProcessAM(&calls, &wg)
 
-	wg.Add(1)
-	ProcessHD(&calls, &wg)
+		wg.Add(1)
+		fmt.Println(time.Since(start))
+		ProcessEN(&calls, &wg)
 
-	wg.Add(1)
-	ProcessLOTW(&calls, &wg)
+		wg.Add(1)
+		fmt.Println(time.Since(start))
+		ProcessHD(&calls, &wg)
 
-	wg.Wait()
+		wg.Add(1)
+		fmt.Println(time.Since(start))
+		ProcessLOTW(&calls, &wg)
 
-	// fmt.Printf("Writing %d files to disk\n", len(calls))
-	// for _, v := range calls {
-	v := calls["KD7MPA"]
-	err = WriteCall(&v, &ht, b2b)
-	if err != nil {
-		log.Fatal(err)
-	}
-	// }
+		wg.Wait()
+		fmt.Println(time.Since(start))
+		fmt.Printf("Writing %d files to disk\n", len(calls))
+		i := 0
+		for _, v := range calls {
+			err = WriteCall(&v, &ht, b2b)
+			if err != nil {
+				log.Fatal(err)
+			}
+			if i%100000 == 0 {
+				fmt.Printf("%d... ", i)
+			}
+			i++
+		}
+		fmt.Println(time.Since(start))
+		done <- true
+
+	}()
+
+	<-done
+	fmt.Println("exiting")
 
 	SaveHashTable(&ht, b2b)
-
+	fmt.Println(time.Since(start))
 }
 
 func DownloadFile(filepath string, u string, wg *sync.WaitGroup) {
@@ -302,11 +337,16 @@ func ProcessEN(calls *map[string]HamCall, wg *sync.WaitGroup) {
 		hc := HamCall{
 			Callsign:   record[4],
 			Name:       record[7],
+			FirstName:  record[8],
+			Mi:         record[9],
+			LastName:   record[10],
 			Address:    record[15],
 			City:       record[16],
 			State:      record[17],
 			Zip:        record[18],
+			PoBox:      record[19],
 			LicenseKey: record[1],
+			FRN:        record[22],
 		}
 
 		// fmt.Print("EN-", record[4], " ")
@@ -346,7 +386,6 @@ func ProcessHD(calls *map[string]HamCall, wg *sync.WaitGroup) {
 			Expiration: record[8],
 			FileNumber: record[2],
 			Effective:  record[42],
-			Zip:        record[18],
 		}
 
 		// fmt.Print("HD-", record[4], " ")
