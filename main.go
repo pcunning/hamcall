@@ -2,11 +2,14 @@ package main
 
 import (
 	"archive/zip"
+	"bytes"
+	"crypto/sha1"
 	"encoding/csv"
+	"encoding/gob"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -18,6 +21,7 @@ import (
 
 	"github.com/imdario/mergo"
 	"github.com/jlaffaye/ftp"
+	"gopkg.in/kothar/go-backblaze.v0"
 )
 
 type HamCall struct {
@@ -34,25 +38,53 @@ type HamCall struct {
 	FRN        string `json:"frn"`
 	FileNumber string `json:"file_number"`
 	LOTW       string `json:"last_lotw"`
+	LicenseKey string `json:"license_key"`
 }
+
+type HashTable map[string]string
 
 func main() {
 
-	var wg sync.WaitGroup
+	keyID := os.Getenv("B2_KEYID")
+	applicationKey := os.Getenv("B2_APPKEY")
 
-	wg.Add(1)
-	go DownloadFile("lotw.csv", "https://lotw.arrl.org/lotw-user-activity.csv", &wg)
+	b2, _ := backblaze.NewB2(backblaze.Credentials{
+		KeyID:          keyID,
+		ApplicationKey: applicationKey,
+	})
 
-	wg.Add(1)
-	go DownloadFTPFile("amat.zip", "ftp://wirelessftp.fcc.gov:21/pub/uls/complete/l_amat.zip", &wg)
-
-	wg.Wait()
-
-	files, err := Unzip("amat.zip", "amat")
+	b2b, err := b2.Bucket("hamcall")
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("Unzipped:\n" + strings.Join(files, "\n"))
+
+	var ht HashTable
+	err = LoadHashTable(&ht, b2b)
+	if err != nil {
+		fmt.Printf("Error loading hash table: %s\n", err)
+		ht = make(HashTable)
+	}
+
+	fmt.Printf("%d entries in hash table\n", len(ht))
+
+	var wg sync.WaitGroup
+
+	// wg.Add(1)
+	// go DownloadFile("lotw.csv", "https://lotw.arrl.org/lotw-user-activity.csv", &wg)
+
+	// wg.Add(1)
+	// go DownloadFile("dmrid.dat", "https://www.radioid.net/static/dmrid.dat", &wg)
+
+	// wg.Add(1)
+	// go DownloadFTPFile("amat.zip", "ftp://wirelessftp.fcc.gov:21/pub/uls/complete/l_amat.zip", &wg)
+
+	// wg.Wait()
+
+	// files, err := Unzip("amat.zip", "amat")
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// fmt.Println("Unzipped:\n" + strings.Join(files, "\n"))
 
 	calls := make(map[string]HamCall)
 
@@ -63,14 +95,23 @@ func main() {
 	ProcessEN(&calls, &wg)
 
 	wg.Add(1)
+	ProcessHD(&calls, &wg)
+
+	wg.Add(1)
 	ProcessLOTW(&calls, &wg)
 
 	wg.Wait()
 
-	fmt.Printf("Writing %d files to disk\n", len(calls))
-	for _, v := range calls {
-		WriteCall(&v)
+	// fmt.Printf("Writing %d files to disk\n", len(calls))
+	// for _, v := range calls {
+	v := calls["KD7MPA"]
+	err = WriteCall(&v, &ht, b2b)
+	if err != nil {
+		log.Fatal(err)
 	}
+	// }
+
+	SaveHashTable(&ht, b2b)
 
 }
 
@@ -259,15 +300,56 @@ func ProcessEN(calls *map[string]HamCall, wg *sync.WaitGroup) {
 		}
 
 		hc := HamCall{
-			Callsign: record[4],
-			Name:     record[7],
-			Address:  record[15],
-			City:     record[16],
-			State:    record[17],
-			Zip:      record[18],
+			Callsign:   record[4],
+			Name:       record[7],
+			Address:    record[15],
+			City:       record[16],
+			State:      record[17],
+			Zip:        record[18],
+			LicenseKey: record[1],
 		}
 
 		// fmt.Print("EN-", record[4], " ")
+		updateMap(calls, &hc, record[4])
+	}
+
+}
+
+func ProcessHD(calls *map[string]HamCall, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	fmt.Println("processing HD")
+
+	f, err := os.Open("amat/HD.dat")
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	r := csv.NewReader(f)
+	r.Comma = '|'
+	r.LazyQuotes = true
+	r.FieldsPerRecord = -1
+
+	for {
+		record, err := r.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			break
+		}
+
+		hc := HamCall{
+			Callsign:   record[4],
+			Grant:      record[7],
+			Expiration: record[8],
+			FileNumber: record[2],
+			Effective:  record[42],
+			Zip:        record[18],
+		}
+
+		// fmt.Print("HD-", record[4], " ")
 		updateMap(calls, &hc, record[4])
 	}
 
@@ -319,18 +401,70 @@ func updateMap(calls *map[string]HamCall, hc *HamCall, call string) {
 	(*calls)[hc.Callsign] = *hc
 }
 
-func WriteCall(data *HamCall) {
+func WriteCall(data *HamCall, ht *HashTable, b2b *backblaze.Bucket) error {
 	// fmt.Print(data.Callsign, " ")
-	call := strings.Replace(data.Callsign, "/", "", -1)
-	path := "calls/" + string(call[0]) + "/" + string(call[1]) + "/" + string(call[2])
-	filename := path + "/" + call + ".json"
-	if _, err := os.Stat(filename); os.IsNotExist(err) {
-		os.MkdirAll(path, 0700)
-	}
+	call := strings.ToLower(strings.Replace(data.Callsign, "/", "-", -1))
+	filename := "callsigns/" + call + ".json"
 	file, _ := json.Marshal(data)
-	err := ioutil.WriteFile(filename, file, 0644)
+	err := uploadIfChanged(filename, &file, ht, b2b)
 	if err != nil {
-		fmt.Println(err)
+		return fmt.Errorf("Error writing %s: %v", filename, err)
 	}
+
+	return nil
+}
+
+func uploadIfChanged(filename string, file *[]byte, ht *HashTable, b2b *backblaze.Bucket) error {
+	hasher := sha1.New()
+	hasher.Write(*file)
+	hs := hasher.Sum(nil)
+	hash := hex.EncodeToString(hs)
+
+	h, exists := (*ht)[filename]
+	if !exists || h != hash {
+		meta, err := b2b.UploadFile(filename, nil, bytes.NewReader((*file)))
+		if err != nil {
+			return err
+		}
+		fmt.Printf("uploaded file %s, %s\n", meta.Name, meta.ContentSha1)
+
+		(*ht)[filename] = hash
+	}
+
+	return nil
+}
+
+func LoadHashTable(ht *HashTable, b2b *backblaze.Bucket) error {
+	_, hashReader, err := b2b.DownloadFileByName("hash.gob")
+	if err != nil {
+		return err
+	}
+	fmt.Printf("downloaded hash file\n")
+
+	hashDecoder := gob.NewDecoder(hashReader)
+	err = hashDecoder.Decode(&ht)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func SaveHashTable(ht *HashTable, b2b *backblaze.Bucket) error {
+	r, w := io.Pipe()
+	go func() {
+		encoder := gob.NewEncoder(w)
+		encoder.Encode(ht)
+		w.Close()
+	}()
+
+	file, err := b2b.UploadFile("hash.gob", nil, r)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("uploaded hash file created at %d\n", file.UploadTimestamp)
+
+	return nil
 
 }

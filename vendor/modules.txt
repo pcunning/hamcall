@@ -1,6 +1,20 @@
+# github.com/golang/glog v1.0.0
+## explicit
+github.com/golang/glog
+# github.com/google/readahead v0.0.0-20161222183148-eaceba169032
+## explicit
+github.com/google/readahead
 # github.com/imdario/mergo v0.3.12
 ## explicit
 github.com/imdario/mergo
 # github.com/jlaffaye/ftp v0.0.0-20210307004419-5d4190119067
 ## explicit
 github.com/jlaffaye/ftp
+# github.com/pquerna/ffjson v0.0.0-20190930134022-aa0246cd15f7
+## explicit
+github.com/pquerna/ffjson/ffjson
+github.com/pquerna/ffjson/fflib/v1
+github.com/pquerna/ffjson/fflib/v1/internal
+# gopkg.in/kothar/go-backblaze.v0 v0.0.0-20210124194846-35409b867216
+## explicit
+gopkg.in/kothar/go-backblaze.v0
