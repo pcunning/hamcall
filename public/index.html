@@ -22,6 +22,9 @@
                 content-visibility: auto;
             }
         }
+        a {
+           @apply underline text-blue-600 hover:text-blue-800 visited:text-purple-600
+        }
     </style>
 </head>
 
@@ -48,15 +51,16 @@
                             href="https://hamcall.dev/callsign.json">https://hamcall.dev/<i>callsign</i>.json</a>
                     </p>
                     <p class="mt-1  text-md">
-                        The data is built automatically from the FCC ULS database weekly files in GitHub Actions and
+                        The data is built automatically from the FCC ULS database weekly files and
                         deployed to BackBlaze B2 behind Cloudflare.
                     </p>
                     <p class="mt-1  text-md">
                         <input
                             class="bg-gray-200 appearance-none border-2 border-gray-100 rounded py-2 px-4 text-gray-700 leading-tight focus:outline-none focus:bg-white focus:border-gray-500"
-                            id="callsign" type="text" placeholder="Callsign">
+                            id="callsignInput" type="text" placeholder="Callsign">
                         <button
-                            class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                            class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                            onclick="goToCall(document.querySelector('#callsignInput').value)">
                             Lookup</button>
                     </p>
                 </div>
@@ -68,7 +72,7 @@
                         {{callsign}}
                     </h3>
                     <p class="mt-1 max-w-2xl text-sm text-gray-500">
-                        {{city}}, {{state}}
+                        {{first_name}} {{last_name}} in {{city}}, {{state}}
                     </p>
                 </div>
                 <div class="border-t border-gray-200">
@@ -94,7 +98,7 @@
                                 Address
                             </dt>
                             <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                                {{address}}
+                                {{address}}, {{city}}, {{state}} {{zip}}
                             </dd>
                         </div>
                         <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
@@ -115,187 +119,80 @@
                         </div>
                         <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                             <dt class="text-sm font-medium text-gray-500">
+                                Effective Date
+                            </dt>
+                            <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                                {{effective}}
+                            </dd>
+                        </div>
+                        <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                            <dt class="text-sm font-medium text-gray-500">
+                                FRN
+                            </dt>
+                            <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                                {{frn}}
+                            </dd>
+                        </div>
+                        <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                            <dt class="text-sm font-medium text-gray-500">
+                                Last LOTW
+                            </dt>
+                            <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                                {{last_lotw}}
+                            </dd>
+                        </div>
+                        <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                            <dt class="text-sm font-medium text-gray-500">
                                 Links
                             </dt>
                             <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                                 <ul role="list" class="border border-gray-200 rounded-md divide-y divide-gray-200">
                                     <li class="pl-3 pr-4 py-3 flex items-center justify-between text-sm">
                                         <div class="w-0 flex-1 flex items-center">
-                                            <svg class="flex-shrink-0 h-5 w-5 text-gray-400"
-                                                xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24"
-                                                height="24" viewBox="0 0 24 24" style=" fill:#000000;">
-                                                <path
-                                                    d="M 5 3 C 3.9069372 3 3 3.9069372 3 5 L 3 19 C 3 20.093063 3.9069372 21 5 21 L 19 21 C 20.093063 21 21 20.093063 21 19 L 21 12 L 19 12 L 19 19 L 5 19 L 5 5 L 12 5 L 12 3 L 5 3 z M 14 3 L 14 5 L 17.585938 5 L 8.2929688 14.292969 L 9.7070312 15.707031 L 19 6.4140625 L 19 10 L 21 10 L 21 3 L 14 3 z">
-                                                </path>
-                                            </svg>
                                             <span class="ml-2 flex-1 w-0 truncate">
+                                                Data:
                                                 <a target="_blank"
-                                                    href="https://wireless2.fcc.gov/UlsApp/UlsSearch/license.jsp?licKey={{license_key}}">https://wireless2.fcc.gov/UlsApp/UlsSearch/license.jsp?licKey={{license_key}}</a>
+                                                    href="https://wireless2.fcc.gov/UlsApp/UlsSearch/license.jsp?licKey={{license_key}}">ULS</a>
+                                                <a target="_blank"
+                                                    href="https://www.radioid.net/database/view?callsign={{callsign}}">radioid</a>
+                                                <a target="_blank"
+                                                    href="https://www.ae7q.com/query/data/CallHistory.php?CALL={{callsign}}">ae7q</a>
                                             </span>
                                         </div>
                                     </li>
                                     <li class="pl-3 pr-4 py-3 flex items-center justify-between text-sm">
                                         <div class="w-0 flex-1 flex items-center">
-                                            <svg class="flex-shrink-0 h-5 w-5 text-gray-400"
-                                                xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24"
-                                                height="24" viewBox="0 0 24 24" style=" fill:#000000;">
-                                                <path
-                                                    d="M 5 3 C 3.9069372 3 3 3.9069372 3 5 L 3 19 C 3 20.093063 3.9069372 21 5 21 L 19 21 C 20.093063 21 21 20.093063 21 19 L 21 12 L 19 12 L 19 19 L 5 19 L 5 5 L 12 5 L 12 3 L 5 3 z M 14 3 L 14 5 L 17.585938 5 L 8.2929688 14.292969 L 9.7070312 15.707031 L 19 6.4140625 L 19 10 L 21 10 L 21 3 L 14 3 z">
-                                                </path>
-                                            </svg>
                                             <span class="ml-2 flex-1 w-0 truncate">
-                                                <a target="_blank"
-                                                    href="https://qrz.com/db/{{callsign}}">https://qrz.com/db/{{callsign}}</a>
+                                                Profiles:
+                                                <a target="_blank" href="https://qrz.com/db/{{callsign}}">QRZ</a>
+                                                <a target="_blank" href="https://qrzcq.com/call/{{callsign}}">QRZCQ</a>
+                                                <a target="_blank" href="https://www.hamqth.com/{{callsign}}">hamqth</a>
                                             </span>
                                         </div>
                                     </li>
                                     <li class="pl-3 pr-4 py-3 flex items-center justify-between text-sm">
                                         <div class="w-0 flex-1 flex items-center">
-                                            <svg class="flex-shrink-0 h-5 w-5 text-gray-400"
-                                                xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24"
-                                                height="24" viewBox="0 0 24 24" style=" fill:#000000;">
-                                                <path
-                                                    d="M 5 3 C 3.9069372 3 3 3.9069372 3 5 L 3 19 C 3 20.093063 3.9069372 21 5 21 L 19 21 C 20.093063 21 21 20.093063 21 19 L 21 12 L 19 12 L 19 19 L 5 19 L 5 5 L 12 5 L 12 3 L 5 3 z M 14 3 L 14 5 L 17.585938 5 L 8.2929688 14.292969 L 9.7070312 15.707031 L 19 6.4140625 L 19 10 L 21 10 L 21 3 L 14 3 z">
-                                                </path>
-                                            </svg>
                                             <span class="ml-2 flex-1 w-0 truncate">
+                                                QSL/Logs:
                                                 <a target="_blank"
-                                                    href="https://qrzcq.com/call/{{callsign}}">https://qrzcq.com/{{callsign}}</a>
+                                                    href="https://www.eqsl.cc/Member.cfm?{{callsign}}">eqsl</a>
+                                                <a target="_blank"
+                                                    href="https://clublog.org/logsearch/{{callsign}}">clublog</a>
                                             </span>
                                         </div>
                                     </li>
                                     <li class="pl-3 pr-4 py-3 flex items-center justify-between text-sm">
                                         <div class="w-0 flex-1 flex items-center">
-                                            <svg class="flex-shrink-0 h-5 w-5 text-gray-400"
-                                                xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24"
-                                                height="24" viewBox="0 0 24 24" style=" fill:#000000;">
-                                                <path
-                                                    d="M 5 3 C 3.9069372 3 3 3.9069372 3 5 L 3 19 C 3 20.093063 3.9069372 21 5 21 L 19 21 C 20.093063 21 21 20.093063 21 19 L 21 12 L 19 12 L 19 19 L 5 19 L 5 5 L 12 5 L 12 3 L 5 3 z M 14 3 L 14 5 L 17.585938 5 L 8.2929688 14.292969 L 9.7070312 15.707031 L 19 6.4140625 L 19 10 L 21 10 L 21 3 L 14 3 z">
-                                                </path>
-                                            </svg>
                                             <span class="ml-2 flex-1 w-0 truncate">
+                                                Spots:
                                                 <a target="_blank"
-                                                    href="https://www.hamqth.com/{{callsign}}">https://www.hamqth.com/{{callsign}}</a>
-                                            </span>
-                                        </div>
-                                    </li>
-                                    <li class="pl-3 pr-4 py-3 flex items-center justify-between text-sm">
-                                        <div class="w-0 flex-1 flex items-center">
-                                            <svg class="flex-shrink-0 h-5 w-5 text-gray-400"
-                                                xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24"
-                                                height="24" viewBox="0 0 24 24" style=" fill:#000000;">
-                                                <path
-                                                    d="M 5 3 C 3.9069372 3 3 3.9069372 3 5 L 3 19 C 3 20.093063 3.9069372 21 5 21 L 19 21 C 20.093063 21 21 20.093063 21 19 L 21 12 L 19 12 L 19 19 L 5 19 L 5 5 L 12 5 L 12 3 L 5 3 z M 14 3 L 14 5 L 17.585938 5 L 8.2929688 14.292969 L 9.7070312 15.707031 L 19 6.4140625 L 19 10 L 21 10 L 21 3 L 14 3 z">
-                                                </path>
-                                            </svg>
-                                            <span class="ml-2 flex-1 w-0 truncate">
+                                                    href="https://pskreporter.info/pskmap.html?preset&callsign={{callsign}}">pskreporter.info</a>
                                                 <a target="_blank"
-                                                    href="https://www.eqsl.cc/Member.cfm?{{callsign}}">https://www.eqsl.cc/Member.cfm?{{callsign}}</a>
-                                            </span>
-                                        </div>
-                                    </li>
-                                    <li class="pl-3 pr-4 py-3 flex items-center justify-between text-sm">
-                                        <div class="w-0 flex-1 flex items-center">
-                                            <svg class="flex-shrink-0 h-5 w-5 text-gray-400"
-                                                xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24"
-                                                height="24" viewBox="0 0 24 24" style=" fill:#000000;">
-                                                <path
-                                                    d="M 5 3 C 3.9069372 3 3 3.9069372 3 5 L 3 19 C 3 20.093063 3.9069372 21 5 21 L 19 21 C 20.093063 21 21 20.093063 21 19 L 21 12 L 19 12 L 19 19 L 5 19 L 5 5 L 12 5 L 12 3 L 5 3 z M 14 3 L 14 5 L 17.585938 5 L 8.2929688 14.292969 L 9.7070312 15.707031 L 19 6.4140625 L 19 10 L 21 10 L 21 3 L 14 3 z">
-                                                </path>
-                                            </svg>
-                                            <span class="ml-2 flex-1 w-0 truncate">
+                                                    href="https://aprs.fi/info/?call={{callsign}}*">aprs.fi</a>
                                                 <a target="_blank"
-                                                    href="http://www.pskreporter.de/table?call={{callsign}}">http://www.pskreporter.de/table?call={{callsign}}</a>
-                                            </span>
-                                        </div>
-                                    </li>
-                                    <li class="pl-3 pr-4 py-3 flex items-center justify-between text-sm">
-                                        <div class="w-0 flex-1 flex items-center">
-                                            <svg class="flex-shrink-0 h-5 w-5 text-gray-400"
-                                                xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24"
-                                                height="24" viewBox="0 0 24 24" style=" fill:#000000;">
-                                                <path
-                                                    d="M 5 3 C 3.9069372 3 3 3.9069372 3 5 L 3 19 C 3 20.093063 3.9069372 21 5 21 L 19 21 C 20.093063 21 21 20.093063 21 19 L 21 12 L 19 12 L 19 19 L 5 19 L 5 5 L 12 5 L 12 3 L 5 3 z M 14 3 L 14 5 L 17.585938 5 L 8.2929688 14.292969 L 9.7070312 15.707031 L 19 6.4140625 L 19 10 L 21 10 L 21 3 L 14 3 z">
-                                                </path>
-                                            </svg>
-                                            <span class="ml-2 flex-1 w-0 truncate">
+                                                    href="http://www.pskreporter.de/table?call={{callsign}}">pskreporter.de</a>
                                                 <a target="_blank"
-                                                    href="https://www.cqcontest.net/arch/archsearch.php?pCall={{callsign}}">https://www.cqcontest.net/arch/archsearch.php?pCall={{callsign}}</a>
-                                            </span>
-                                        </div>
-                                    </li>
-                                    <li class="pl-3 pr-4 py-3 flex items-center justify-between text-sm">
-                                        <div class="w-0 flex-1 flex items-center">
-                                            <svg class="flex-shrink-0 h-5 w-5 text-gray-400"
-                                                xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24"
-                                                height="24" viewBox="0 0 24 24" style=" fill:#000000;">
-                                                <path
-                                                    d="M 5 3 C 3.9069372 3 3 3.9069372 3 5 L 3 19 C 3 20.093063 3.9069372 21 5 21 L 19 21 C 20.093063 21 21 20.093063 21 19 L 21 12 L 19 12 L 19 19 L 5 19 L 5 5 L 12 5 L 12 3 L 5 3 z M 14 3 L 14 5 L 17.585938 5 L 8.2929688 14.292969 L 9.7070312 15.707031 L 19 6.4140625 L 19 10 L 21 10 L 21 3 L 14 3 z">
-                                                </path>
-                                            </svg>
-                                            <span class="ml-2 flex-1 w-0 truncate">
-                                                <a target="_blank"
-                                                    href="https://www.ae7q.com/query/data/CallHistory.php?CALL={{callsign}}">https://www.ae7q.com/query/data/CallHistory.php?CALL={{callsign}}</a>
-                                            </span>
-                                        </div>
-                                    </li>
-                                    <li class="pl-3 pr-4 py-3 flex items-center justify-between text-sm">
-                                        <div class="w-0 flex-1 flex items-center">
-                                            <svg class="flex-shrink-0 h-5 w-5 text-gray-400"
-                                                xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24"
-                                                height="24" viewBox="0 0 24 24" style=" fill:#000000;">
-                                                <path
-                                                    d="M 5 3 C 3.9069372 3 3 3.9069372 3 5 L 3 19 C 3 20.093063 3.9069372 21 5 21 L 19 21 C 20.093063 21 21 20.093063 21 19 L 21 12 L 19 12 L 19 19 L 5 19 L 5 5 L 12 5 L 12 3 L 5 3 z M 14 3 L 14 5 L 17.585938 5 L 8.2929688 14.292969 L 9.7070312 15.707031 L 19 6.4140625 L 19 10 L 21 10 L 21 3 L 14 3 z">
-                                                </path>
-                                            </svg>
-                                            <span class="ml-2 flex-1 w-0 truncate">
-                                                <a target="_blank"
-                                                    href="https://www.radioid.net/database/view?callsign={{callsign}}">https://www.radioid.net/database/view?callsign={{callsign}}</a>
-                                            </span>
-                                        </div>
-                                    </li>
-                                    <li class="pl-3 pr-4 py-3 flex items-center justify-between text-sm">
-                                        <div class="w-0 flex-1 flex items-center">
-                                            <svg class="flex-shrink-0 h-5 w-5 text-gray-400"
-                                                xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24"
-                                                height="24" viewBox="0 0 24 24" style=" fill:#000000;">
-                                                <path
-                                                    d="M 5 3 C 3.9069372 3 3 3.9069372 3 5 L 3 19 C 3 20.093063 3.9069372 21 5 21 L 19 21 C 20.093063 21 21 20.093063 21 19 L 21 12 L 19 12 L 19 19 L 5 19 L 5 5 L 12 5 L 12 3 L 5 3 z M 14 3 L 14 5 L 17.585938 5 L 8.2929688 14.292969 L 9.7070312 15.707031 L 19 6.4140625 L 19 10 L 21 10 L 21 3 L 14 3 z">
-                                                </path>
-                                            </svg>
-                                            <span class="ml-2 flex-1 w-0 truncate">
-                                                <a target="_blank"
-                                                    href="https://pskreporter.info/pskmap.html?preset&callsign={{callsign}}">https://pskreporter.info/pskmap.html?preset&callsign={{callsign}}</a>
-                                            </span>
-                                        </div>
-                                    </li>
-                                    <li class="pl-3 pr-4 py-3 flex items-center justify-between text-sm">
-                                        <div class="w-0 flex-1 flex items-center">
-                                            <svg class="flex-shrink-0 h-5 w-5 text-gray-400"
-                                                xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24"
-                                                height="24" viewBox="0 0 24 24" style=" fill:#000000;">
-                                                <path
-                                                    d="M 5 3 C 3.9069372 3 3 3.9069372 3 5 L 3 19 C 3 20.093063 3.9069372 21 5 21 L 19 21 C 20.093063 21 21 20.093063 21 19 L 21 12 L 19 12 L 19 19 L 5 19 L 5 5 L 12 5 L 12 3 L 5 3 z M 14 3 L 14 5 L 17.585938 5 L 8.2929688 14.292969 L 9.7070312 15.707031 L 19 6.4140625 L 19 10 L 21 10 L 21 3 L 14 3 z">
-                                                </path>
-                                            </svg>
-                                            <span class="ml-2 flex-1 w-0 truncate">
-                                                <a target="_blank"
-                                                    href="https://aprs.fi/info/?call={{callsign}}*">https://aprs.fi/info/?call={{callsign}}*</a>
-                                            </span>
-                                        </div>
-                                    </li>
-                                    <li class="pl-3 pr-4 py-3 flex items-center justify-between text-sm">
-                                        <div class="w-0 flex-1 flex items-center">
-                                            <svg class="flex-shrink-0 h-5 w-5 text-gray-400"
-                                                xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="24"
-                                                height="24" viewBox="0 0 24 24" style=" fill:#000000;">
-                                                <path
-                                                    d="M 5 3 C 3.9069372 3 3 3.9069372 3 5 L 3 19 C 3 20.093063 3.9069372 21 5 21 L 19 21 C 20.093063 21 21 20.093063 21 19 L 21 12 L 19 12 L 19 19 L 5 19 L 5 5 L 12 5 L 12 3 L 5 3 z M 14 3 L 14 5 L 17.585938 5 L 8.2929688 14.292969 L 9.7070312 15.707031 L 19 6.4140625 L 19 10 L 21 10 L 21 3 L 14 3 z">
-                                                </path>
-                                            </svg>
-                                            <span class="ml-2 flex-1 w-0 truncate">
-                                                <a target="_blank"
-                                                    href="https://clublog.org/logsearch/{{callsign}}">https://clublog.org/logsearch/{{callsign}}</a>
+                                                    href="https://www.cqcontest.net/arch/archsearch.php?pCall={{callsign}}">cqcontest</a>
                                             </span>
                                         </div>
                                     </li>
@@ -311,17 +208,32 @@
 </html>
 
 <script>
+    document.querySelector('#callsignInput').addEventListener("keyup", event => {
+        console.log(event);
+        if (event.key === 'Enter') {
+            goToCall(event.target.value);
+        }
+    });
+
+    function goToCall(input) {
+        window.location.href = "/" + input;
+    }
+
+    const callinfo = document.querySelector("#callinfo");
+
     if (window.location.pathname != "/") {
         const callsign = window.location.pathname.substring(1);
         fetch("https://hamcall.dev/" + callsign + ".json")
             .then(response => response.json())
             .then(data => {
                 console.log(data)
-                for (const key in data) {
-                    document.body.innerHTML = document.body.innerHTML.replaceAll(`{{${key}}}`, data[key]);
+                if (data.callsign) {
+                    for (const key in data) {
+                        callinfo.innerHTML = callinfo.innerHTML.replaceAll(`{{${key}}}`, data[key]);
+                    }
+                    callinfo.classList.remove("hidden");
                 }
-                let callinfo = document.querySelector("#callinfo");
-                callinfo.classList.remove("hidden");
             });
     }
+
 </script>

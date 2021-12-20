@@ -23,6 +23,7 @@ import (
 
 	"github.com/imdario/mergo"
 	"github.com/jlaffaye/ftp"
+	"github.com/puzpuzpuz/xsync"
 	"gopkg.in/kothar/go-backblaze.v0"
 )
 
@@ -48,8 +49,14 @@ type HamCall struct {
 }
 
 type HashTable map[string]string
+type Upload struct {
+	FileName    string
+	FileContent *[]byte
+}
 
 func main() {
+
+	uploadWorkersCount := 200
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
@@ -77,74 +84,100 @@ func main() {
 		ht = make(HashTable)
 	}
 
+	xht := xsync.NewMap()
+	for k, v := range ht {
+		xht.Store(k, v)
+	}
+
 	go func() {
 		<-sigs
 		done <- true
 	}()
 
 	go func() {
-		fmt.Println(time.Since(start))
+		fmt.Printf("%s: ", time.Since(start))
 		fmt.Printf("%d entries in hash table\n", len(ht))
 
 		var wg sync.WaitGroup
 
-		// wg.Add(1)
-		// go DownloadFile("lotw.csv", "https://lotw.arrl.org/lotw-user-activity.csv", &wg)
+		wg.Add(1)
+		go DownloadFile("lotw.csv", "https://lotw.arrl.org/lotw-user-activity.csv", &wg)
 
-		// wg.Add(1)
-		// go DownloadFile("dmrid.dat", "https://www.radioid.net/static/dmrid.dat", &wg)
+		wg.Add(1)
+		go DownloadFile("dmrid.dat", "https://www.radioid.net/static/dmrid.dat", &wg)
 
-		// wg.Add(1)
-		// go DownloadFTPFile("amat.zip", "ftp://wirelessftp.fcc.gov:21/pub/uls/complete/l_amat.zip", &wg)
+		wg.Add(1)
+		go DownloadFTPFile("amat.zip", "ftp://wirelessftp.fcc.gov:21/pub/uls/complete/l_amat.zip", &wg)
 
-		// wg.Wait()
+		wg.Wait()
 
-		// fmt.Println(time.Since(start))
-		// files, err := Unzip("amat.zip", "amat")
-		// if err != nil {
-		// 	log.Fatal(err)
-		// }
-		// fmt.Println("Unzipped:\n" + strings.Join(files, "\n"))
+		fmt.Println(time.Since(start))
+		files, err := Unzip("amat.zip", "amat")
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println("Unzipped:\n" + strings.Join(files, "\n"))
 
 		calls := make(map[string]HamCall)
 
 		wg.Add(1)
-		fmt.Println(time.Since(start))
+		fmt.Printf("%s: ", time.Since(start))
 		ProcessAM(&calls, &wg)
 
 		wg.Add(1)
-		fmt.Println(time.Since(start))
+		fmt.Printf("%s: ", time.Since(start))
 		ProcessEN(&calls, &wg)
 
 		wg.Add(1)
-		fmt.Println(time.Since(start))
+		fmt.Printf("%s: ", time.Since(start))
 		ProcessHD(&calls, &wg)
 
 		wg.Add(1)
-		fmt.Println(time.Since(start))
+		fmt.Printf("%s: ", time.Since(start))
 		ProcessLOTW(&calls, &wg)
 
 		wg.Wait()
-		fmt.Println(time.Since(start))
-		fmt.Printf("Writing %d files to disk\n", len(calls))
-		i := 0
+
+		// Create workers
+		fmt.Printf("%s: creating workers\n", time.Since(start))
+		uploadTasks := make(chan Upload, uploadWorkersCount*2)
+		group := sync.WaitGroup{}
+		for i := 0; i < uploadWorkersCount; i++ {
+			group.Add(1)
+			go UploadWorker(uploadTasks, xht, b2b, &group)
+		}
+
+		fmt.Printf("%s: Writing %d files to disk\n", time.Since(start), len(calls))
+		i := 1
+		batchTime := time.Now()
 		for _, v := range calls {
-			err = WriteCall(&v, &ht, b2b)
+			err = WriteCall(&v, xht, uploadTasks)
 			if err != nil {
 				log.Fatal(err)
 			}
-			if i%100000 == 0 {
-				fmt.Printf("%d... ", i)
+			if i%1000 == 0 {
+				rps := 1000 / time.Since(batchTime).Seconds()
+				etr := time.Duration((float64(len(calls)-i) / rps)) * time.Second
+				fmt.Printf("%s: %d... %s = %.2f/second etr: %s\n", time.Since(start), i, time.Since(batchTime), rps, etr)
+				batchTime = time.Now()
 			}
 			i++
 		}
-		fmt.Println(time.Since(start))
+
+		close(uploadTasks)
+		group.Wait()
+
+		fmt.Printf("%s: ", time.Since(start))
 		done <- true
 
 	}()
 
 	<-done
-	fmt.Println("exiting")
+	fmt.Printf("\n\nexiting... please wait while saving hash table\n\n")
+	xht.Range(func(k string, v interface{}) bool {
+		ht[k] = v.(string)
+		return true
+	})
 
 	SaveHashTable(&ht, b2b)
 	fmt.Println(time.Since(start))
@@ -440,37 +473,36 @@ func updateMap(calls *map[string]HamCall, hc *HamCall, call string) {
 	(*calls)[hc.Callsign] = *hc
 }
 
-func WriteCall(data *HamCall, ht *HashTable, b2b *backblaze.Bucket) error {
+func WriteCall(data *HamCall, xht *xsync.Map, task chan Upload) error {
 	// fmt.Print(data.Callsign, " ")
 	call := strings.ToLower(strings.Replace(data.Callsign, "/", "-", -1))
 	filename := "callsigns/" + call + ".json"
 	file, _ := json.Marshal(data)
-	err := uploadIfChanged(filename, &file, ht, b2b)
-	if err != nil {
-		return fmt.Errorf("Error writing %s: %v", filename, err)
-	}
-
+	task <- Upload{FileName: filename, FileContent: &file}
 	return nil
 }
 
-func uploadIfChanged(filename string, file *[]byte, ht *HashTable, b2b *backblaze.Bucket) error {
-	hasher := sha1.New()
-	hasher.Write(*file)
-	hs := hasher.Sum(nil)
-	hash := hex.EncodeToString(hs)
+func UploadWorker(task chan Upload, xht *xsync.Map, b2b *backblaze.Bucket, wg *sync.WaitGroup) {
+	for file := range task {
 
-	h, exists := (*ht)[filename]
-	if !exists || h != hash {
-		meta, err := b2b.UploadFile(filename, nil, bytes.NewReader((*file)))
-		if err != nil {
-			return err
+		hasher := sha1.New()
+		hasher.Write(*file.FileContent)
+		hs := hasher.Sum(nil)
+		hash := hex.EncodeToString(hs)
+
+		h, exists := xht.Load(file.FileName)
+		if !exists || h.(string) != hash {
+
+			meta, err := b2b.UploadFile(file.FileName, nil, bytes.NewReader((*file.FileContent)))
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+			xht.Store(file.FileName, meta.ContentSha1)
+			// fmt.Printf("uploaded file %s, %s = %s\n", meta.Name, meta.ContentSha1, hash)
 		}
-		fmt.Printf("uploaded file %s, %s\n", meta.Name, meta.ContentSha1)
-
-		(*ht)[filename] = hash
 	}
-
-	return nil
+	wg.Done()
 }
 
 func LoadHashTable(ht *HashTable, b2b *backblaze.Bucket) error {
