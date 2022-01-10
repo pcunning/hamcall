@@ -158,8 +158,8 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
-			if i%1000 == 0 {
-				rps := 1000 / time.Since(batchTime).Seconds()
+			if i%10000 == 0 {
+				rps := 10000 / time.Since(batchTime).Seconds()
 				etr := time.Duration((float64(len(calls)-i) / rps)) * time.Second
 				fmt.Printf("%s: %d... %s = %.2f/second etr: %s\n", time.Since(start), i, time.Since(batchTime), rps, etr)
 				batchTime = time.Now()
