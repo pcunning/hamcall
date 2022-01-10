@@ -67,10 +67,13 @@ func main() {
 	keyID := os.Getenv("B2_KEYID")
 	applicationKey := os.Getenv("B2_APPKEY")
 
-	b2, _ := backblaze.NewB2(backblaze.Credentials{
+	b2, err := backblaze.NewB2(backblaze.Credentials{
 		KeyID:          keyID,
 		ApplicationKey: applicationKey,
 	})
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	b2b, err := b2.Bucket("hamcall")
 	if err != nil {
