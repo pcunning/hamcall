@@ -1,6 +1,9 @@
 name: Run Build
 
 on:
+  schedule:
+    # https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows
+    - cron:  '0 0 * * 1'
   workflow_dispatch:
   
 jobs:
