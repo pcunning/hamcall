@@ -17,3 +17,6 @@ jobs:
 
     - name: Run
       run: go run main.go
+      env:
+        B2_KEYID: ${{ secrets.B2_KEYID }}
+        B2_APPKEY: ${{ secrets.B2_APPKEY }}
