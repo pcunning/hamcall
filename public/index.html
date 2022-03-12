@@ -103,7 +103,7 @@
                                 Address
                             </dt>
                             <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                                {{address}}, {{city}}, {{state}} {{zip}}
+                                {{address}}{{po_box}}, {{city}}, {{state}} {{zip}}
                             </dd>
                         </div>
                         <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
@@ -234,6 +234,29 @@
                 console.log(data)
                 if (data.callsign) {
                     for (const key in data) {
+                        if (key == "po_box" && data[key] != "") {
+                            data[key] = "PO BOX " + data[key];
+                        }
+
+                        if (key == "class") {
+                            switch (data[key]) {
+                                case "E":
+                                    data[key] = "Amateur Extra";
+                                    break;
+                                case "T":
+                                    data[key] = "Technician";
+                                    break;
+                                case "G":
+                                    data[key] = "General";
+                                    break;
+                                case "N":
+                                    data[key] = "Novice";
+                                    break;
+                                default:
+                                    break;
+                            }
+                        }
+
                         callinfo.innerHTML = callinfo.innerHTML.replaceAll(`{{${key}}}`, data[key]);
                     }
                     callinfo.classList.remove("hidden");
