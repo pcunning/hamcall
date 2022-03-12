@@ -26,7 +26,7 @@ func main() {
 	start := time.Now()
 
 	downloadDataFiles := flag.Bool("dl", false, "skip downloading files")
-	runMode := flag.String("m", "cli", "run mode: b2, cli, or web")
+	runMode := flag.String("m", "cli", "run mode: cli, stats, b2, or web")
 	flag.Parse()
 
 	sigs := make(chan os.Signal, 1)
@@ -51,11 +51,15 @@ func main() {
 	calls := make(map[string]data.HamCall)
 	process(&calls)
 
-	if *runMode == "b2" {
-		writeToB2(&calls, keyID, applicationKey, uploadWorkers, osSigExit)
+	if *runMode == "b2" || *runMode == "stats" {
+		dryRun := true
+		if *runMode == "b2" {
+			dryRun = false
+		}
+		writeToB2(&calls, keyID, applicationKey, uploadWorkers, osSigExit, dryRun)
 	}
 
-	if *runMode == "cli" {
+	if *runMode == "cli" || *runMode == "stats" {
 		cli(&calls)
 	}
 
@@ -80,9 +84,9 @@ func process(calls *map[string]data.HamCall) {
 	lotw.Process(calls)
 }
 
-func writeToB2(calls *map[string]data.HamCall, keyID, applicationKey string, uploadWorkers int, osSigExit chan bool) {
+func writeToB2(calls *map[string]data.HamCall, keyID, applicationKey string, uploadWorkers int, osSigExit chan bool, dryRun bool) {
 
-	b, err := b2.New(keyID, applicationKey, uploadWorkers)
+	b, err := b2.New(keyID, applicationKey, uploadWorkers, dryRun)
 	if err != nil {
 		fmt.Println("error creating b2 client: ", err)
 		return

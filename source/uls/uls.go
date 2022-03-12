@@ -142,7 +142,7 @@ func ProcessHD(calls *map[string]data.HamCall) {
 			Callsign:   record[4],
 			Grant:      record[7],
 			Expiration: record[8],
-			FileNumber: record[2],
+			FileNumber: record[2], // this is missing in the ULS data for some HV records - Is it in applications download?
 			Effective:  record[42],
 		}
 

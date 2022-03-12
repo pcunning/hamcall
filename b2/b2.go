@@ -21,6 +21,8 @@ type b2 struct {
 	b2b     *backblaze.Bucket
 	xht     *xsync.Map
 	workers int
+	dryRun  bool
+	updated *int
 }
 
 type hashTable map[string]string
@@ -30,7 +32,7 @@ type upload struct {
 	FileContent *[]byte
 }
 
-func New(keyID, applicationKey string, workers int) (*b2, error) {
+func New(keyID, applicationKey string, workers int, dryRun bool) (*b2, error) {
 	b, err := backblaze.NewB2(backblaze.Credentials{
 		KeyID:          keyID,
 		ApplicationKey: applicationKey,
@@ -46,7 +48,9 @@ func New(keyID, applicationKey string, workers int) (*b2, error) {
 
 	xht := xsync.NewMap()
 
-	return &b2{b2b, xht, workers}, nil
+	updated := 0
+
+	return &b2{b2b, xht, workers, dryRun, &updated}, nil
 }
 
 func (b b2) Write(calls *map[string]data.HamCall, osSigExit chan bool) error {
@@ -65,14 +69,14 @@ func (b b2) Write(calls *map[string]data.HamCall, osSigExit chan bool) error {
 		group := sync.WaitGroup{}
 		for i := 0; i < b.workers; i++ {
 			group.Add(1)
-			go uploadWorker(uploadTasks, b.xht, b.b2b, &group)
+			go b.uploadWorker(uploadTasks, &group)
 		}
 
-		fmt.Printf("%s: Writing %d files to disk\n", time.Since(start), len(*calls))
+		fmt.Printf("%s: Writing %d files\n", time.Since(start), len(*calls))
 		i := 1
 		batchTime := time.Now()
 		for _, v := range *calls {
-			writeCall(&v, b.xht, uploadTasks)
+			writeCall(&v, uploadTasks)
 
 			if i%10000 == 0 {
 				rps := 10000 / time.Since(batchTime).Seconds()
@@ -92,20 +96,24 @@ func (b b2) Write(calls *map[string]data.HamCall, osSigExit chan bool) error {
 
 	<-osSigExit
 
-	fmt.Printf("\n\nexiting... please wait while saving hash table\n\n")
-	saveHashTable(b.xht, b.b2b)
+	fmt.Printf("%d updated callsigns\n", *b.updated)
+
+	if !b.dryRun {
+		fmt.Printf("\n\nexiting... please wait while saving hash table\n\n")
+		saveHashTable(b.xht, b.b2b)
+	}
+
 	return nil
 }
 
-func writeCall(data *data.HamCall, xht *xsync.Map, task chan upload) {
-	// fmt.Print(data.Callsign, " ")
+func writeCall(data *data.HamCall, task chan upload) {
 	call := strings.ToLower(strings.Replace(data.Callsign, "/", "-", -1))
 	filename := "callsigns/" + call + ".json"
 	file, _ := json.Marshal(data)
 	task <- upload{FileName: filename, FileContent: &file}
 }
 
-func uploadWorker(task chan upload, xht *xsync.Map, b2b *backblaze.Bucket, wg *sync.WaitGroup) {
+func (b b2) uploadWorker(task chan upload, wg *sync.WaitGroup) {
 	for file := range task {
 
 		hasher := sha1.New()
@@ -113,16 +121,18 @@ func uploadWorker(task chan upload, xht *xsync.Map, b2b *backblaze.Bucket, wg *s
 		hs := hasher.Sum(nil)
 		hash := hex.EncodeToString(hs)
 
-		h, exists := xht.Load(file.FileName)
+		h, exists := b.xht.Load(file.FileName)
 		if !exists || h.(string) != hash {
-
-			meta, err := b2b.UploadFile(file.FileName, nil, bytes.NewReader((*file.FileContent)))
-			if err != nil {
-				fmt.Println(err)
-				continue
+			if !b.dryRun {
+				meta, err := b.b2b.UploadFile(file.FileName, nil, bytes.NewReader((*file.FileContent)))
+				if err != nil {
+					fmt.Println(err)
+					continue
+				}
+				b.xht.Store(file.FileName, meta.ContentSha1)
+				// fmt.Printf("uploaded file %s, %s = %s\n", meta.Name, meta.ContentSha1, hash)
 			}
-			xht.Store(file.FileName, meta.ContentSha1)
-			// fmt.Printf("uploaded file %s, %s = %s\n", meta.Name, meta.ContentSha1, hash)
+			(*b.updated)++
 		}
 	}
 	wg.Done()
