@@ -1,13 +1,20 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
+	"flag"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
+	"regexp"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	"github.com/manifoldco/promptui"
 	"github.com/pcunning/hamcall/b2"
 	"github.com/pcunning/hamcall/data"
 	"github.com/pcunning/hamcall/source/lotw"
@@ -17,6 +24,10 @@ import (
 
 func main() {
 	start := time.Now()
+
+	downloadDataFiles := flag.Bool("dl", false, "skip downloading files")
+	runMode := flag.String("m", "cli", "run mode: b2, cli, or web")
+	flag.Parse()
 
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
@@ -31,12 +42,22 @@ func main() {
 	applicationKey := os.Getenv("B2_APPKEY")
 	uploadWorkers := 200
 
-	downloadFiles()
+	if *downloadDataFiles {
+		downloadFiles()
+	} else {
+		fmt.Println("skipping downloading files (run with -dl to download)")
+	}
 
 	calls := make(map[string]data.HamCall)
 	process(&calls)
 
-	writeToB2(&calls, keyID, applicationKey, uploadWorkers, osSigExit)
+	if *runMode == "b2" {
+		writeToB2(&calls, keyID, applicationKey, uploadWorkers, osSigExit)
+	}
+
+	if *runMode == "cli" {
+		cli(&calls)
+	}
 
 	fmt.Printf("total runtime %s\n", time.Since(start).String())
 }
@@ -71,5 +92,35 @@ func writeToB2(calls *map[string]data.HamCall, keyID, applicationKey string, upl
 	if err != nil {
 		fmt.Printf("%s\n", err)
 		return
+	}
+}
+
+func cli(calls *map[string]data.HamCall) {
+	validate := func(input string) error {
+		var usCall = regexp.MustCompile(`^[AKNW][A-Z]{0,2}[0123456789][A-Z]{1,3}$`)
+
+		if !usCall.MatchString(strings.ToUpper(input)) {
+			return errors.New("Invalid callsign")
+		}
+		return nil
+	}
+
+	for {
+		prompt := promptui.Prompt{
+			Label:    "Callsign",
+			Validate: validate,
+		}
+
+		result, err := prompt.Run()
+
+		if err != nil {
+			fmt.Printf("Prompt failed %v\n", err)
+			return
+		}
+		j, err := json.MarshalIndent((*calls)[strings.ToUpper(result)], "", "  ")
+		if err != nil {
+			log.Fatalf(err.Error())
+		}
+		fmt.Printf("%s\n", string(j))
 	}
 }

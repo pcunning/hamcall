@@ -3,23 +3,22 @@ name: Run Build
 on:
   schedule:
     # https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows
-    - cron:  '0 0 * * 1'
+    - cron: "0 0 * * 1"
   workflow_dispatch:
-  
-jobs:
 
+jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+      - uses: actions/checkout@v2
 
-    - name: Set up Go
-      uses: actions/setup-go@v2
-      with:
-        go-version: 1.17
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.17
 
-    - name: Run
-      run: go run main.go
-      env:
-        B2_KEYID: ${{ secrets.B2_KEYID }}
-        B2_APPKEY: ${{ secrets.B2_APPKEY }}
+      - name: Run
+        run: go run main.go -dl -m=b2
+        env:
+          B2_KEYID: ${{ secrets.B2_KEYID }}
+          B2_APPKEY: ${{ secrets.B2_APPKEY }}
