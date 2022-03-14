@@ -22,3 +22,27 @@ jobs:
         env:
           B2_KEYID: ${{ secrets.B2_KEYID }}
           B2_APPKEY: ${{ secrets.B2_APPKEY }}
+
+      - name: Send custom JSON data to Slack workflow
+        id: slack
+        uses: slackapi/slack-github-action@v1.18.0
+        with:
+          # For posting a rich message using Block Kit
+          payload: |
+            {
+              "text": "GitHub Action build result: ${{ job.status }}",
+              "blocks": [
+                {
+                  "username": "hamcall",
+                  "icon_emoji": ":runner:",
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "GitHub Action build result: ${{ job.status }} ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
