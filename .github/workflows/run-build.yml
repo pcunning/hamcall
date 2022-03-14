@@ -22,14 +22,7 @@ jobs:
         env:
           B2_KEYID: ${{ secrets.B2_KEYID }}
           B2_APPKEY: ${{ secrets.B2_APPKEY }}
-  slackNotification:
-    name: Slack Notification
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Slack Notification
-        uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_USERNAME: hamcall
-          SLACK_CHANNEL: hamcall
+
+      - name: Send workflow notification
+        run: |
+          curl -X POST --data-urlencode "payload={\"channel\": \"#hamcall\", \"username\": \"webhookbot\", \"text\": \"GitHub Action build result: ${{ job.status }} ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\", \"icon_emoji\": \":runner:\"}" ${{ secrets.SLACK_WEBHOOK }}
