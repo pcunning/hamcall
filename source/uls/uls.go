@@ -17,12 +17,12 @@ func Download(wg *sync.WaitGroup) error {
 
 	fmt.Println("Downloading ULS data")
 
-	err := downloader.FetchFtp("tmp/amat.zip", "ftp://wirelessftp.fcc.gov:21/pub/uls/complete/l_amat.zip")
+	err := downloader.FetchFtp("amat.zip", "ftp://wirelessftp.fcc.gov:21/pub/uls/complete/l_amat.zip")
 	if err != nil {
 		return err
 	}
 
-	files, err := downloader.Unzip("tmp/amat.zip", "tmp/amat")
+	files, err := downloader.Unzip("amat.zip", "amat")
 	if err != nil {
 		return err
 	}
@@ -41,7 +41,7 @@ func Process(calls *map[string]data.HamCall) {
 func ProcessAM(calls *map[string]data.HamCall) {
 	fmt.Println("processing AM")
 
-	f, err := os.Open("tmp/amat/AM.dat")
+	f, err := os.Open("amat/AM.dat")
 	if err != nil {
 		return
 	}
@@ -74,7 +74,7 @@ func ProcessAM(calls *map[string]data.HamCall) {
 func ProcessEN(calls *map[string]data.HamCall) {
 	fmt.Println("processing EN")
 
-	f, err := os.Open("tmp/amat/EN.dat")
+	f, err := os.Open("amat/EN.dat")
 	if err != nil {
 		return
 	}
@@ -118,7 +118,7 @@ func ProcessEN(calls *map[string]data.HamCall) {
 func ProcessHD(calls *map[string]data.HamCall) {
 	fmt.Println("processing HD")
 
-	f, err := os.Open("tmp/amat/HD.dat")
+	f, err := os.Open("amat/HD.dat")
 	if err != nil {
 		return
 	}

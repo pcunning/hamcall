@@ -15,7 +15,7 @@ import (
 func Download(wg *sync.WaitGroup) error {
 	defer wg.Done()
 	fmt.Println("Downloading radioid data")
-	err := downloader.FetchHttp("tmp/dmrid.dat", "https://www.radioid.net/static/dmrid.dat")
+	err := downloader.FetchHttp("dmrid.dat", "https://www.radioid.net/static/dmrid.dat")
 	if err != nil {
 		return err
 	}
@@ -23,7 +23,7 @@ func Download(wg *sync.WaitGroup) error {
 }
 
 func Process(calls *map[string]data.HamCall) {
-	f, err := os.Open("tmp/dmrid.dat")
+	f, err := os.Open("dmrid.dat")
 	if err != nil {
 		return
 	}

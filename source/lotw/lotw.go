@@ -14,7 +14,7 @@ import (
 func Download(wg *sync.WaitGroup) error {
 	defer wg.Done()
 	fmt.Println("Downloading lotw data")
-	err := downloader.FetchHttp("tmp/lotw.csv", "https://lotw.arrl.org/lotw-user-activity.csv")
+	err := downloader.FetchHttp("lotw.csv", "https://lotw.arrl.org/lotw-user-activity.csv")
 	if err != nil {
 		return err
 	}
@@ -25,7 +25,7 @@ func Process(calls *map[string]data.HamCall) {
 
 	fmt.Println("processing LOTW")
 
-	f, err := os.Open("tmp/lotw.csv")
+	f, err := os.Open("lotw.csv")
 	if err != nil {
 		fmt.Println(err)
 		return
