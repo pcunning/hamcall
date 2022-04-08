@@ -17,6 +17,7 @@ import (
 	"github.com/manifoldco/promptui"
 	"github.com/pcunning/hamcall/b2"
 	"github.com/pcunning/hamcall/data"
+	"github.com/pcunning/hamcall/source/geo"
 	"github.com/pcunning/hamcall/source/lotw"
 	"github.com/pcunning/hamcall/source/radioid"
 	"github.com/pcunning/hamcall/source/uls"
@@ -44,12 +45,15 @@ func main() {
 
 	if *downloadDataFiles {
 		downloadFiles()
+		fmt.Printf("download finished at %s\n", time.Since(start).String())
+
 	} else {
 		fmt.Println("skipping downloading files (run with -dl to download)")
 	}
 
 	calls := make(map[string]data.HamCall)
 	process(&calls)
+	fmt.Printf("processing finished at %s\n", time.Since(start).String())
 
 	if *runMode == "b2" || *runMode == "stats" {
 		dryRun := true
@@ -74,6 +78,7 @@ func downloadFiles() {
 	go uls.Download(&wg)
 	go radioid.Download(&wg)
 	go lotw.Download(&wg)
+	// go geo.Download(&wg)
 
 	wg.Wait()
 }
@@ -82,6 +87,7 @@ func process(calls *map[string]data.HamCall) {
 	uls.Process(calls)
 	radioid.Process(calls)
 	lotw.Process(calls)
+	geo.Process(calls)
 }
 
 func writeToB2(calls *map[string]data.HamCall, keyID, applicationKey string, uploadWorkers int, osSigExit chan bool, dryRun bool) {

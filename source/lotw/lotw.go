@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/pcunning/hamcall/data"
 	"github.com/pcunning/hamcall/downloader"
@@ -22,8 +23,8 @@ func Download(wg *sync.WaitGroup) error {
 }
 
 func Process(calls *map[string]data.HamCall) {
-
-	fmt.Println("processing LOTW")
+	start := time.Now()
+	fmt.Print("processing LOTW")
 
 	f, err := os.Open("lotw.csv")
 	if err != nil {
@@ -44,10 +45,19 @@ func Process(calls *map[string]data.HamCall) {
 			break
 		}
 
-		hc := data.HamCall{
-			Callsign: record[0],
-			LOTW:     record[1] + record[2],
+		call := record[0]
+		item, c := (*calls)[call]
+		if c {
+			item.LOTW = record[1] + record[2]
+		} else {
+			item = data.HamCall{
+				Callsign: call,
+				LOTW:     record[1] + record[2],
+			}
 		}
-		data.UpdateMap(calls, &hc, record[0])
+		(*calls)[call] = item
 	}
+
+	fmt.Printf(" ... %s\n", time.Since(start).String())
+
 }

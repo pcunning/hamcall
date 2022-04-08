@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/pcunning/hamcall/data"
 	"github.com/pcunning/hamcall/downloader"
@@ -39,7 +40,8 @@ func Process(calls *map[string]data.HamCall) {
 }
 
 func ProcessAM(calls *map[string]data.HamCall) {
-	fmt.Println("processing AM")
+	start := time.Now()
+	fmt.Print("processing AM")
 
 	f, err := os.Open("amat/AM.dat")
 	if err != nil {
@@ -61,18 +63,25 @@ func ProcessAM(calls *map[string]data.HamCall) {
 			break
 		}
 
-		hc := data.HamCall{
-			Callsign: record[4],
-			Class:    record[5],
+		call := record[4]
+		item, c := (*calls)[call]
+		if c {
+			item.Callsign = record[4]
+			item.Class = record[5]
+		} else {
+			item = data.HamCall{
+				Callsign: record[4],
+				Class:    record[5],
+			}
 		}
-
-		// fmt.Print("AM-", record[4], " ")
-		data.UpdateMap(calls, &hc, record[4])
+		(*calls)[call] = item
 	}
+	fmt.Printf(" ... %s\n", time.Since(start).String())
 }
 
 func ProcessEN(calls *map[string]data.HamCall) {
-	fmt.Println("processing EN")
+	start := time.Now()
+	fmt.Print("processing EN")
 
 	f, err := os.Open("amat/EN.dat")
 	if err != nil {
@@ -94,29 +103,46 @@ func ProcessEN(calls *map[string]data.HamCall) {
 			break
 		}
 
-		hc := data.HamCall{
-			Callsign:   record[4],
-			Name:       record[7],
-			FirstName:  record[8],
-			Mi:         record[9],
-			LastName:   record[10],
-			Address:    record[15],
-			City:       record[16],
-			State:      record[17],
-			Zip:        record[18],
-			PoBox:      record[19],
-			LicenseKey: record[1],
-			FRN:        record[22],
+		call := record[4]
+		item, c := (*calls)[call]
+		if c {
+			item.Callsign = record[4]
+			item.Name = record[7]
+			item.FirstName = record[8]
+			item.Mi = record[9]
+			item.LastName = record[10]
+			item.Address = record[15]
+			item.City = record[16]
+			item.State = record[17]
+			item.Zip = record[18]
+			item.PoBox = record[19]
+			item.LicenseKey = record[1]
+			item.FRN = record[22]
+		} else {
+			item = data.HamCall{
+				Callsign:   record[4],
+				Name:       record[7],
+				FirstName:  record[8],
+				Mi:         record[9],
+				LastName:   record[10],
+				Address:    record[15],
+				City:       record[16],
+				State:      record[17],
+				Zip:        record[18],
+				PoBox:      record[19],
+				LicenseKey: record[1],
+				FRN:        record[22],
+			}
 		}
-
-		// fmt.Print("EN-", record[4], " ")
-		data.UpdateMap(calls, &hc, record[4])
+		(*calls)[call] = item
 	}
 
+	fmt.Printf(" ... %s\n", time.Since(start).String())
 }
 
 func ProcessHD(calls *map[string]data.HamCall) {
-	fmt.Println("processing HD")
+	start := time.Now()
+	fmt.Print("processing HD")
 
 	f, err := os.Open("amat/HD.dat")
 	if err != nil {
@@ -138,16 +164,25 @@ func ProcessHD(calls *map[string]data.HamCall) {
 			break
 		}
 
-		hc := data.HamCall{
-			Callsign:   record[4],
-			Grant:      record[7],
-			Expiration: record[8],
-			FileNumber: record[2], // this is missing in the ULS data for some HV records - Is it in applications download?
-			Effective:  record[42],
+		call := record[4]
+		item, c := (*calls)[call]
+		if c {
+			item.Callsign = record[4]
+			item.Grant = record[7]
+			item.Expiration = record[8]
+			item.FileNumber = record[2] // this is missing in the ULS data for some HV records - Is it in applications download?
+			item.Effective = record[42]
+		} else {
+			item = data.HamCall{
+				Callsign:   record[4],
+				Grant:      record[7],
+				Expiration: record[8],
+				FileNumber: record[2],
+				Effective:  record[42],
+			}
 		}
-
-		// fmt.Print("HD-", record[4], " ")
-		data.UpdateMap(calls, &hc, record[4])
+		(*calls)[call] = item
 	}
+	fmt.Printf(" ... %s\n", time.Since(start).String())
 
 }

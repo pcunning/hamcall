@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/pcunning/hamcall/data"
 	"github.com/pcunning/hamcall/downloader"
@@ -23,6 +24,9 @@ func Download(wg *sync.WaitGroup) error {
 }
 
 func Process(calls *map[string]data.HamCall) {
+	start := time.Now()
+	fmt.Print("processing radioID")
+
 	f, err := os.Open("dmrid.dat")
 	if err != nil {
 		return
@@ -43,14 +47,23 @@ func Process(calls *map[string]data.HamCall) {
 			break
 		}
 
+		id, err := strconv.Atoi(record[0])
+		if err != nil {
+			continue
+		}
+
 		call := record[1]
 		item, c := (*calls)[call]
 		if c {
-			id, err := strconv.Atoi(record[0])
-			if err == nil {
-				item.DMRID = append(item.DMRID, id)
-				(*calls)[call] = item
+			item.DMRID = append(item.DMRID, id)
+		} else {
+			item = data.HamCall{
+				Callsign: call,
+				DMRID:    []int{id},
 			}
+
 		}
+		(*calls)[call] = item
 	}
+	fmt.Printf(" ... %s\n", time.Since(start).String())
 }
