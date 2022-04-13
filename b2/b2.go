@@ -78,10 +78,10 @@ func (b b2) Write(calls *map[string]data.HamCall, osSigExit chan bool) error {
 		for _, v := range *calls {
 			writeCall(&v, uploadTasks)
 
-			if i%10000 == 0 {
-				rps := 10000 / time.Since(batchTime).Seconds()
+			if i%100000 == 0 {
+				rps := 100000 / time.Since(batchTime).Seconds()
 				etr := time.Duration((float64(len(*calls)-i) / rps)) * time.Second
-				fmt.Printf("%s: %d... %s = %.2f/second etr: %s\n", time.Since(start), i, time.Since(batchTime), rps, etr)
+				fmt.Printf("\r%s: %d... %s = %.2f/second etr: %s                        ", time.Since(start), i, time.Since(batchTime), rps, etr)
 				batchTime = time.Now()
 			}
 			i++
@@ -90,7 +90,7 @@ func (b b2) Write(calls *map[string]data.HamCall, osSigExit chan bool) error {
 		close(uploadTasks)
 		group.Wait()
 
-		fmt.Printf("%s: ", time.Since(start))
+		fmt.Printf("\n%s: ", time.Since(start))
 		osSigExit <- true
 	}()
 
