@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -55,6 +56,7 @@ func New(keyID, applicationKey string, workers int, dryRun bool) (*b2, error) {
 
 func (b b2) Write(calls *map[string]data.HamCall, osSigExit chan bool) error {
 
+	ghActions := os.Getenv("GITHUB_ACTIONS")
 	start := time.Now()
 
 	err := loadHashTable(b.xht, b.b2b)
@@ -64,7 +66,9 @@ func (b b2) Write(calls *map[string]data.HamCall, osSigExit chan bool) error {
 
 	go func() {
 		// Create workers
-		fmt.Println("::group::B2 uploader")
+		if ghActions == "true" {
+			fmt.Println("::group::B2 uploader")
+		}
 		fmt.Printf("%s: creating workers\n", time.Since(start))
 		uploadTasks := make(chan upload, b.workers*2)
 		group := sync.WaitGroup{}
@@ -82,7 +86,7 @@ func (b b2) Write(calls *map[string]data.HamCall, osSigExit chan bool) error {
 			if i%100000 == 0 {
 				rps := 100000 / time.Since(batchTime).Seconds()
 				etr := time.Duration((float64(len(*calls)-i) / rps)) * time.Second
-				fmt.Printf("\r%s: %d... %s = %.2f/second etr: %s                        ", time.Since(start), i, time.Since(batchTime), rps, etr)
+				fmt.Printf("%s: %d... %s = %.2f/second etr: %s\n", time.Since(start), i, time.Since(batchTime), rps, etr)
 				batchTime = time.Now()
 			}
 			i++
@@ -91,21 +95,24 @@ func (b b2) Write(calls *map[string]data.HamCall, osSigExit chan bool) error {
 		close(uploadTasks)
 		group.Wait()
 
-		fmt.Printf("\n%s: ", time.Since(start))
+		fmt.Printf("%s: ", time.Since(start))
 		osSigExit <- true
 	}()
 
 	<-osSigExit
 
 	fmt.Printf("%d updated callsigns\n", *b.updated)
-	fmt.Printf("::set-output name=updated-records::%d\n", *b.updated)
 
 	if !b.dryRun {
 		fmt.Printf("\n\nexiting... please wait while saving hash table\n\n")
 		saveHashTable(b.xht, b.b2b)
 	}
 
-	fmt.Println("::endgroup::")
+	if ghActions == "true" {
+		fmt.Printf("::set-output name=updated-records::%d\n", *b.updated)
+		fmt.Printf("::set-output name=run-time::%s\n", time.Since(start))
+		fmt.Println("::endgroup::")
+	}
 
 	return nil
 }

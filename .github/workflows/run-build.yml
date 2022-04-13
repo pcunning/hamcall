@@ -15,7 +15,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.17
+          go-version: 1.18
 
       - name: Run
         id: run_hamcall
@@ -26,4 +26,4 @@ jobs:
 
       - name: Send workflow notification
         run: |
-          curl -X POST --data-urlencode "payload={\"channel\": \"#hamcall\", \"username\": \"webhookbot\", \"text\": \"GitHub Action build result: ${{ job.status }}\n Updated ${{steps.run_hamcall.outputs.updated-records}}\n ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\", \"icon_emoji\": \":runner:\"}" ${{ secrets.SLACK_WEBHOOK }}
+          curl -X POST --data-urlencode "payload={\"channel\": \"#hamcall\", \"username\": \"webhookbot\", \"text\": \"GitHub Action build result: ${{ job.status }}\n Updated ${{steps.run_hamcall.outputs.updated-records}} records in ${{steps.run_hamcall.outputs.run-time}}\n ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\", \"icon_emoji\": \":runner:\"}" ${{ secrets.SLACK_WEBHOOK }}
