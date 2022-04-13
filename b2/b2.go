@@ -64,6 +64,7 @@ func (b b2) Write(calls *map[string]data.HamCall, osSigExit chan bool) error {
 
 	go func() {
 		// Create workers
+		fmt.Println("::group::B2 uploader")
 		fmt.Printf("%s: creating workers\n", time.Since(start))
 		uploadTasks := make(chan upload, b.workers*2)
 		group := sync.WaitGroup{}
@@ -97,11 +98,14 @@ func (b b2) Write(calls *map[string]data.HamCall, osSigExit chan bool) error {
 	<-osSigExit
 
 	fmt.Printf("%d updated callsigns\n", *b.updated)
+	fmt.Printf("::set-output name=updated-records::%d\n", *b.updated)
 
 	if !b.dryRun {
 		fmt.Printf("\n\nexiting... please wait while saving hash table\n\n")
 		saveHashTable(b.xht, b.b2b)
 	}
+
+	fmt.Println("::endgroup::")
 
 	return nil
 }

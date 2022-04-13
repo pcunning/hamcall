@@ -26,4 +26,4 @@ jobs:
 
       - name: Send workflow notification
         run: |
-          curl -X POST --data-urlencode "payload={\"channel\": \"#hamcall\", \"username\": \"webhookbot\", \"text\": \"GitHub Action build result: ${{ job.status }} ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n```${{join(steps.run_hamcall.outputs.*, '\n')}}```\", \"icon_emoji\": \":runner:\"}" ${{ secrets.SLACK_WEBHOOK }}
+          curl -X POST --data-urlencode "payload={\"channel\": \"#hamcall\", \"username\": \"webhookbot\", \"text\": \"GitHub Action build result: ${{ job.status }}\n Updated ${{steps.run_hamcall.outputs.updated-records}}\n ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\", \"icon_emoji\": \":runner:\"}" ${{ secrets.SLACK_WEBHOOK }}
