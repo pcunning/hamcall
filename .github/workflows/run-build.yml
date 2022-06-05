@@ -23,6 +23,7 @@ jobs:
         env:
           B2_KEYID: ${{ secrets.B2_KEYID }}
           B2_APPKEY: ${{ secrets.B2_APPKEY }}
+          GEO_URL: ${{ secrets.GEO_URL }}
 
       - name: Send workflow notification
         run: |
