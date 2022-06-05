@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"strconv"
 	"sync"
@@ -18,7 +19,7 @@ func Download(wg *sync.WaitGroup) error {
 	fmt.Println("Downloading GEO data")
 	err := downloader.FetchHttp("ham-stations.csv", os.Getenv("GEO_URL"))
 	if err != nil {
-		return err
+		log.Fatalf("Error downloading GEO data: %v", err)
 	}
 	return nil
 }

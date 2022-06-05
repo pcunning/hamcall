@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"sync"
 	"time"
@@ -17,7 +18,7 @@ func Download(wg *sync.WaitGroup) error {
 	fmt.Println("Downloading lotw data")
 	err := downloader.FetchHttp("lotw.csv", "https://lotw.arrl.org/lotw-user-activity.csv")
 	if err != nil {
-		return err
+		log.Fatalf("Error downloading LOTW data: %v", err)
 	}
 	return nil
 }
