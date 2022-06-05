@@ -37,3 +37,10 @@ My initial build process wrote to a file in several passes for each ULS file it 
 To be fair this is significantly outside of a normal use case for Netlify. Looking at other static site hosts like Cloudflare I would be limited to [20k files](https://developers.cloudflare.com/pages/platform/limits#files). So against better judgment I decided to gave it a try locally and 5 min later I had 1.5 million files in a directory. I spent the next 3 hours figuring out how to delete the files (rsync from an empty folder finally worked). Lets not do that again.
 
 Since the hangup is moving the files to the CDN the next step was to write them directly to a CDN. Once I updated the program my first run took several hours to build and upload all 1.5 Million files (over residential internet) but thankfully I thought ahead and saved the hash for each file so subsequent runs can compare and only update changed files.
+
+## Data Sources
+
+- FCC ULS Database https://www.fcc.gov/uls/transactions/daily-weekly
+- LOTW https://lotw.arrl.org/
+- RadioID https://www.radioid.net/
+- Location https://haminfo.tetranz.com

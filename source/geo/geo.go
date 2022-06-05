@@ -10,10 +10,16 @@ import (
 	"time"
 
 	"github.com/pcunning/hamcall/data"
+	"github.com/pcunning/hamcall/downloader"
 )
 
 func Download(wg *sync.WaitGroup) error {
-	// Need to determin how to store and retrieve the data
+	defer wg.Done()
+	fmt.Println("Downloading GEO data")
+	err := downloader.FetchHttp("ham-stations.csv", os.Getenv("GEO_URL"))
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

@@ -17,6 +17,7 @@ import (
 	"github.com/manifoldco/promptui"
 	"github.com/pcunning/hamcall/b2"
 	"github.com/pcunning/hamcall/data"
+	"github.com/pcunning/hamcall/source/geo"
 	"github.com/pcunning/hamcall/source/lotw"
 	"github.com/pcunning/hamcall/source/radioid"
 	"github.com/pcunning/hamcall/source/uls"
@@ -72,12 +73,12 @@ func main() {
 func downloadFiles() {
 	var wg sync.WaitGroup
 
-	wg.Add(3)
+	wg.Add(4)
 
 	go uls.Download(&wg)
 	go radioid.Download(&wg)
 	go lotw.Download(&wg)
-	// go geo.Download(&wg)
+	go geo.Download(&wg)
 
 	wg.Wait()
 }
@@ -86,7 +87,7 @@ func process(calls *map[string]data.HamCall) {
 	uls.Process(calls)
 	radioid.Process(calls)
 	lotw.Process(calls)
-	// geo.Process(calls)
+	geo.Process(calls)
 }
 
 func writeToB2(calls *map[string]data.HamCall, keyID, applicationKey string, uploadWorkers int, osSigExit chan bool, dryRun bool) {
