@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"regexp"
@@ -65,6 +67,10 @@ func main() {
 
 	if *runMode == "cli" || *runMode == "stats" {
 		cli(&calls)
+	}
+
+	if *runMode == "web" {
+		web(&calls, osSigExit)
 	}
 
 	fmt.Printf("total runtime %s\n", time.Since(start).String())
@@ -133,4 +139,34 @@ func cli(calls *map[string]data.HamCall) {
 		}
 		fmt.Printf("%s\n", string(j))
 	}
+}
+
+func web(calls *map[string]data.HamCall, osSigExit chan bool) {
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		call := r.URL.Path[len("/") : len(r.URL.Path)-len(".json")]
+		fmt.Printf("%s: %s\n", r.Method, r.URL.Path)
+		j, err := json.Marshal((*calls)[strings.ToUpper(call)])
+		if err != nil {
+			// log.Fatalf(err.Error())
+		}
+		fmt.Fprintf(w, "%s", j)
+	})
+
+	server := &http.Server{Addr: ":8080", Handler: handler}
+
+	go func() {
+		if err := server.ListenAndServe(); err != nil {
+			// handle err
+		}
+	}()
+
+	<-osSigExit
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := server.Shutdown(ctx); err != nil {
+		// handle err
+	}
+
 }
