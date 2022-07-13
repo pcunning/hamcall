@@ -1,4 +1,4 @@
-# hamcall.dev
+# [hamcall.dev](https://hamcall.dev)
 
 This project creates a service to lookup of amateur radio call signs that is fast, scalable and simple.
 
