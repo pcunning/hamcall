@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -23,6 +24,8 @@ import (
 	"github.com/pcunning/hamcall/source/lotw"
 	"github.com/pcunning/hamcall/source/radioid"
 	"github.com/pcunning/hamcall/source/uls"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func main() {
@@ -71,6 +74,10 @@ func main() {
 
 	if *runMode == "web" {
 		web(&calls, osSigExit)
+	}
+
+	if *runMode == "sqlite" {
+		qslite(&calls, osSigExit)
 	}
 
 	fmt.Printf("total runtime %s\n", time.Since(start).String())
@@ -169,4 +176,119 @@ func web(calls *map[string]data.HamCall, osSigExit chan bool) {
 		// handle err
 	}
 
+}
+
+func qslite(calls *map[string]data.HamCall, osSigExit chan bool) {
+	os.Remove("hamcall.db")
+
+	fmt.Println("Creating hamcall.db...")
+	file, err := os.Create("hamcall.db")
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	file.Close()
+	log.Println("hamcall.db created")
+
+	db, _ := sql.Open("sqlite3", "./hamcall.db")
+	defer db.Close()
+
+	create, err := db.Prepare(`CREATE TABLE hamcall (
+		"id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,	
+		"callsign" TEXT,
+		"name" TEXT,
+		"address" TEXT,
+		"city" TEXT,
+		"state" TEXT,
+		"zip" TEXT,
+		"po_box" TEXT,
+		"license_key" TEXT,
+		"frn" TEXT,
+		"grant" TEXT,
+		"expiration" TEXT,
+		"file_number" TEXT,
+		"effective" TEXT,
+		"class" TEXT	
+	  );`)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	create.Exec()
+	log.Println("created call table")
+
+	index, err := db.Prepare(`CREATE UNIQUE INDEX callsign_index ON hamcall (callsign);`)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	index.Exec()
+	log.Println("created callsign index")
+
+	sync, err := db.Prepare(`PRAGMA synchronous = OFF;`)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	sync.Exec()
+	log.Println("turned off synchronous mode")
+
+	journal, err := db.Prepare(`PRAGMA journal_mode = MEMORY;`)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	journal.Exec()
+	log.Println("set journal mode to memory")
+
+	insertStudentSQL := `INSERT INTO hamcall(
+		callsign,
+		name,
+		address,
+		city,
+		state,
+		zip,
+		po_box,
+		license_key,
+		frn,
+		grant,
+		expiration,
+		file_number,
+		effective,
+		class
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`
+
+	insert, err := db.Prepare(insertStudentSQL)
+	if err != nil {
+		log.Fatalln(err.Error())
+	}
+
+	go func() {
+
+		i := 0
+		for _, call := range *calls {
+
+			_, err = insert.Exec(
+				call.Callsign,
+				call.Name,
+				call.Address,
+				call.City,
+				call.State,
+				call.Zip,
+				call.PoBox,
+				call.LicenseKey,
+				call.FRN,
+				call.Grant,
+				call.Expiration,
+				call.FileNumber,
+				call.Effective,
+				call.Class,
+			)
+			if err != nil {
+				log.Fatalln(err.Error())
+			}
+
+			i++
+			if i%100000 == 0 {
+				log.Printf("%d calls inserted\n", i)
+			}
+		}
+		osSigExit <- true
+	}()
+	<-osSigExit
 }
