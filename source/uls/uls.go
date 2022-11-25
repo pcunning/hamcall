@@ -1,6 +1,7 @@
 package uls
 
 import (
+	"bufio"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -125,19 +126,19 @@ func ProcessEN(calls *map[string]data.HamCall) {
 	}
 	defer f.Close()
 
-	r := csv.NewReader(f)
-	r.Comma = '|'
-	r.LazyQuotes = true
-	r.FieldsPerRecord = -1
-
+	r := bufio.NewReader(f)
 	for {
-		record, err := r.Read()
+		line, _, err := r.ReadLine()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			break
+			fmt.Printf("Error: %s\n", err.Error())
+			continue
 		}
+
+		s := string(line)
+		record := strings.Split(s, "|")
 
 		if len(record) < 25 {
 			fmt.Printf("record too short: %v\n", record)
