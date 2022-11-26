@@ -156,6 +156,7 @@
                                         <div class="w-0 flex-1 flex items-center">
                                             <span class="ml-2 flex-1 w-0 truncate">
                                                 Data:
+                                                <a target="_blank" href="https://hamcall.dev/{{callsign}}.json">json</a>
                                                 <a target="_blank"
                                                     href="https://wireless2.fcc.gov/UlsApp/UlsSearch/license.jsp?licKey={{license_key}}">ULS</a>
                                                 <a target="_blank"
@@ -236,6 +237,9 @@
                     for (const key in data) {
                         if (key == "po_box" && data[key] != "") {
                             data[key] = "PO BOX " + data[key];
+                        }
+                        if (key == "first_name" && data[key] == "") {
+                            data[key] = data["name"];
                         }
 
                         if (key == "class") {
