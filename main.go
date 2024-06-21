@@ -21,7 +21,7 @@ import (
 	"github.com/pcunning/hamcall/b2"
 	"github.com/pcunning/hamcall/data"
 	"github.com/pcunning/hamcall/source/geo"
-	"github.com/pcunning/hamcall/source/lotw"
+	// "github.com/pcunning/hamcall/source/lotw"
 	"github.com/pcunning/hamcall/source/radioid"
 	"github.com/pcunning/hamcall/source/uls"
 
@@ -90,7 +90,7 @@ func downloadFiles() {
 
 	go uls.Download(&wg)
 	go radioid.Download(&wg)
-	go lotw.Download(&wg)
+	// go lotw.Download(&wg)
 	go geo.Download(&wg)
 
 	wg.Wait()
@@ -99,7 +99,7 @@ func downloadFiles() {
 func process(calls *map[string]data.HamCall) {
 	uls.Process(calls)
 	radioid.Process(calls)
-	lotw.Process(calls)
+	// lotw.Process(calls)
 	geo.Process(calls)
 }
 
