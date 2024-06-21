@@ -86,7 +86,7 @@ func main() {
 func downloadFiles() {
 	var wg sync.WaitGroup
 
-	wg.Add(4)
+	wg.Add(3)
 
 	go uls.Download(&wg)
 	go radioid.Download(&wg)
