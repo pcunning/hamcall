@@ -19,7 +19,7 @@ type HamCall struct {
 	FileNumber string    `json:"file_number"`
 	LOTW       string    `json:"last_lotw"`
 	LicenseKey string    `json:"license_key"`
-	DMRID      []int     `json:"dmr_id,omitempty"`
+	DMRID      []string     `json:"dmr_id,omitempty"`
 	Location   *Location `json:"location,omitempty"`
 }
 

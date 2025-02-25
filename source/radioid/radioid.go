@@ -56,11 +56,11 @@ func Process(calls *map[string]data.HamCall) {
 		call := record[1]
 		item, c := (*calls)[call]
 		if c {
-			item.DMRID = append(item.DMRID, id)
+			item.DMRID = append(item.DMRID, strconv.Itoa(id))
 		} else {
 			item = data.HamCall{
 				Callsign: call,
-				DMRID:    []int{id},
+				DMRID:    []string{strconv.Itoa(id)},
 			}
 
 		}
