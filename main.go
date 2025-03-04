@@ -21,6 +21,7 @@ import (
 	"github.com/pcunning/hamcall/b2"
 	"github.com/pcunning/hamcall/data"
 	"github.com/pcunning/hamcall/source/geo"
+	"github.com/pcunning/hamcall/source/ised"
 	"github.com/pcunning/hamcall/source/lotw"
 	"github.com/pcunning/hamcall/source/radioid"
 	"github.com/pcunning/hamcall/source/uls"
@@ -86,9 +87,10 @@ func main() {
 func downloadFiles() {
 	var wg sync.WaitGroup
 
-	wg.Add(4)
+	wg.Add(5)
 
 	go uls.Download(&wg)
+	go ised.Download(&wg)
 	go radioid.Download(&wg)
 	go lotw.Download(&wg)
 	go geo.Download(&wg)
@@ -98,6 +100,7 @@ func downloadFiles() {
 
 func process(calls *map[string]data.HamCall) {
 	uls.Process(calls)
+	ised.Process(calls, "ised_data/amateur_delim.txt")
 	radioid.Process(calls)
 	lotw.Process(calls)
 	geo.Process(calls)
@@ -122,9 +125,12 @@ func cli(calls *map[string]data.HamCall) {
 	validate := func(input string) error {
 		var usCall = regexp.MustCompile(`^[AKNW][A-Z]{0,2}[0123456789][A-Z]{1,3}$`)
 
-		if !usCall.MatchString(strings.ToUpper(input)) {
+		var caCall = regexp.MustCompile(`^(?:VE|VA|VB)[0123456789][A-Z]{1,3}$`)
+
+		if !usCall.MatchString(strings.ToUpper(input)) && !caCall.MatchString(strings.ToUpper(input)) {
 			return errors.New("Invalid callsign")
 		}
+
 		return nil
 	}
 
