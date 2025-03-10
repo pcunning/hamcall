@@ -1,6 +1,6 @@
 module github.com/pcunning/hamcall
 
-go 1.18
+go 1.24.1
 
 require (
 	github.com/jlaffaye/ftp v0.0.0-20220630165035-11536801d1ff
