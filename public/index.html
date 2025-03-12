@@ -237,6 +237,7 @@
             .then(data => {
                 console.log(data)
                 if (data.callsign) {
+                    const labels = ['callsign', 'first_name', 'last_name', 'city', 'state', 'name', 'class', 'address', 'po_box', 'zip', 'grant', 'expiration', 'effective', 'frn', 'last_lotw']
                     for (const key in data) {
                         if (key == "po_box" && data[key] != "") {
                             data[key] = "PO BOX " + data[key];
@@ -265,6 +266,9 @@
                         }
 
                         callinfo.innerHTML = callinfo.innerHTML.replaceAll(`{{${key}}}`, data[key]);
+                    }
+                    for(const label in labels) {
+                        callinfo.innerHTML = callinfo.innerHTML.replaceAll(`{{${label}}}`, '');
                     }
                     callinfo.classList.remove("hidden");
                 }
