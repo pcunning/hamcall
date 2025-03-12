@@ -268,7 +268,7 @@
                         callinfo.innerHTML = callinfo.innerHTML.replaceAll(`{{${key}}}`, data[key]);
                     }
                     for(const label in labels) {
-                        callinfo.innerHTML = callinfo.innerHTML.replaceAll(`{{${label}}}`, '');
+                        callinfo.innerHTML = callinfo.innerHTML.replaceAll(`{{${labels[label]}}}`, '');
                     }
                     callinfo.classList.remove("hidden");
                 }
