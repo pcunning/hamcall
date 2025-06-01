@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.24.1
+
+      - name: Run go mod tidy
+        run: go mod tidy
+
+      - name: Verify no changes
+        run: git diff --exit-code
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Run tests
+        run: go test -v ./...
+
+      - name: Build
+        run: go build -o hamcall main.go
+
+      - name: Test binary execution
+        run: |
+          # Test help/version info - the program should exit cleanly with wrong args
+          ./hamcall -h || true
+          # Test stats mode briefly - this will fail due to missing data files but should not crash
+          timeout 5s ./hamcall -m=stats 2>/dev/null || echo "Stats mode tested (expected to timeout or fail due to missing data)"

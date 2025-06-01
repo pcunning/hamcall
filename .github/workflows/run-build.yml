@@ -1,4 +1,4 @@
-name: Run Build
+name: Weekly Data Update
 
 on:
   schedule:
@@ -7,19 +7,22 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  update:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Download latest hamcall binary
+        run: |
+          # Get the latest release
+          LATEST_RELEASE=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r '.tag_name')
+          echo "Latest release: $LATEST_RELEASE"
+          
+          # Download the binary
+          curl -L -o hamcall "https://github.com/${{ github.repository }}/releases/download/$LATEST_RELEASE/hamcall"
+          chmod +x hamcall
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: 1.24.1
-
-      - name: Run
+      - name: Run hamcall
         id: run_hamcall
-        run: go run main.go -dl -m=b2
+        run: ./hamcall -dl -m=b2
         env:
           B2_KEYID: ${{ secrets.B2_KEYID }}
           B2_APPKEY: ${{ secrets.B2_APPKEY }}

@@ -148,7 +148,7 @@ func cli(calls *map[string]data.HamCall) {
 		}
 		j, err := json.MarshalIndent((*calls)[strings.ToUpper(result)], "", "  ")
 		if err != nil {
-			log.Fatalf("%s", err.Error())
+			log.Fatalf("error marshaling JSON: %v", err)
 		}
 		fmt.Printf("%s\n", string(j))
 	}
