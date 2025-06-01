@@ -1,0 +1,28 @@
+name: Deploy Static Assets
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.24.1
+
+      - name: Deploy static assets
+        id: deploy_assets
+        run: go run main.go -m=deploy
+        env:
+          B2_KEYID: ${{ secrets.B2_KEYID }}
+          B2_APPKEY: ${{ secrets.B2_APPKEY }}
+
+      - name: Send deployment notification
+        run: |
+          curl -X POST --data-urlencode "payload={\"username\": \"Github Actions\", \"icon_url\": \"https://camo.githubusercontent.com/eeb25c8fe7d597494949032a0a1b2e79830bd8c69d5cc495efdb62fac04007c0/68747470733a2f2f63646e2e73766172756e2e6465762f67682f616374696f6e732e706e67\", \"attachments\": [{\"author_name\": \"hamcall.dev\", \"title\": \"static deploy result: ${{ job.status }}\", \"title_link\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\", \"text\": \"Updated ${{steps.deploy_assets.outputs.updated-files}} files in ${{steps.deploy_assets.outputs.run-time}}\"}]}" ${{ secrets.DISCORD_WEBHOOK }}
