@@ -3,6 +3,8 @@ name: Deploy Static Assets
 on:
   push:
     branches: [main]
+    paths:
+      - 'public/**'
   workflow_dispatch:
 
 jobs:
@@ -29,7 +31,7 @@ jobs:
           echo "Found ${FILE_COUNT} files to sync"
           
           # Sync public directory to bucket root
-          b2 sync public/ b2://hamcall/ --delete
+          b2 sync public/ b2://hamcall/
           
           # Calculate runtime
           END_TIME=$(date +%s)
