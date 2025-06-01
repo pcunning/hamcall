@@ -33,7 +33,7 @@ func main() {
 	start := time.Now()
 
 	downloadDataFiles := flag.Bool("dl", false, "skip downloading files")
-	runMode := flag.String("m", "cli", "run mode: cli, stats, b2, deploy, or web")
+	runMode := flag.String("m", "cli", "run mode: cli, stats, b2, or web")
 	flag.Parse()
 
 	sigs := make(chan os.Signal, 1)
@@ -55,12 +55,6 @@ func main() {
 
 	} else {
 		fmt.Println("skipping downloading files (run with -dl to download)")
-	}
-
-	if *runMode == "deploy" {
-		deployStaticAssets(keyID, applicationKey, uploadWorkers, osSigExit, false)
-		fmt.Printf("total runtime %s\n", time.Since(start).String())
-		return
 	}
 
 	calls := make(map[string]data.HamCall)
@@ -121,20 +115,6 @@ func writeToB2(calls *map[string]data.HamCall, keyID, applicationKey string, upl
 	}
 
 	err = b.Write(calls, osSigExit)
-	if err != nil {
-		fmt.Printf("%s\n", err)
-		return
-	}
-}
-
-func deployStaticAssets(keyID, applicationKey string, uploadWorkers int, osSigExit chan bool, dryRun bool) {
-	b, err := b2.New(keyID, applicationKey, uploadWorkers, dryRun)
-	if err != nil {
-		fmt.Println("error creating b2 client: ", err)
-		return
-	}
-
-	err = b.WriteStaticAssets("public", osSigExit)
 	if err != nil {
 		fmt.Printf("%s\n", err)
 		return

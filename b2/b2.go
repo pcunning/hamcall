@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -118,99 +117,11 @@ func (b b2) Write(calls *map[string]data.HamCall, osSigExit chan bool) error {
 	return nil
 }
 
-func (b b2) WriteStaticAssets(staticDir string, osSigExit chan bool) error {
-	ghActions := os.Getenv("GITHUB_ACTIONS")
-	start := time.Now()
-
-	err := loadHashTable(b.xht, b.b2b)
-	if err != nil {
-		return err
-	}
-
-	// Find all files in the static directory
-	var files []string
-	err = filepath.Walk(staticDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() {
-			relPath, err := filepath.Rel(staticDir, path)
-			if err != nil {
-				return err
-			}
-			files = append(files, relPath)
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-
-	go func() {
-		// Create workers
-		if ghActions == "true" {
-			fmt.Println("::group::B2 static assets uploader")
-		}
-		fmt.Printf("%s: creating workers\n", time.Since(start))
-		uploadTasks := make(chan upload, b.workers*2)
-		group := sync.WaitGroup{}
-		for i := 0; i < b.workers; i++ {
-			group.Add(1)
-			go b.uploadWorker(uploadTasks, &group)
-		}
-
-		fmt.Printf("%s: Writing %d static files\n", time.Since(start), len(files))
-		for _, file := range files {
-			err := writeStaticFile(staticDir, file, uploadTasks)
-			if err != nil {
-				fmt.Printf("Error processing file %s: %v\n", file, err)
-				continue
-			}
-		}
-
-		close(uploadTasks)
-		group.Wait()
-
-		fmt.Printf("%s: ", time.Since(start))
-		osSigExit <- true
-	}()
-
-	<-osSigExit
-
-	fmt.Printf("%d updated static files\n", *b.updated)
-
-	if !b.dryRun {
-		fmt.Printf("\n\nexiting... please wait while saving hash table\n\n")
-		saveHashTable(b.xht, b.b2b)
-	}
-
-	if ghActions == "true" {
-		fmt.Printf("::set-output name=updated-files::%d\n", *b.updated)
-		fmt.Printf("::set-output name=run-time::%s\n", time.Since(start))
-		fmt.Println("::endgroup::")
-	}
-
-	return nil
-}
-
 func writeCall(data *data.HamCall, task chan upload) {
 	call := strings.ToLower(strings.Replace(data.Callsign, "/", "-", -1))
 	filename := "callsigns/" + call + ".json"
 	file, _ := json.Marshal(data)
 	task <- upload{FileName: filename, FileContent: &file}
-}
-
-func writeStaticFile(staticDir, relPath string, task chan upload) error {
-	fullPath := filepath.Join(staticDir, relPath)
-	content, err := os.ReadFile(fullPath)
-	if err != nil {
-		return err
-	}
-	
-	// Convert windows path separators to forward slashes for B2
-	filename := strings.ReplaceAll(relPath, "\\", "/")
-	task <- upload{FileName: filename, FileContent: &content}
-	return nil
 }
 
 func (b b2) uploadWorker(task chan upload, wg *sync.WaitGroup) {

@@ -11,14 +11,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: 1.24.1
+      - name: Install B2 CLI
+        run: |
+          pip install b2
 
       - name: Deploy static assets
         id: deploy_assets
-        run: go run main.go -m=deploy
+        run: |
+          # Authenticate with B2
+          b2 account authorize $B2_KEYID $B2_APPKEY
+          
+          # Record start time  
+          START_TIME=$(date +%s)
+          
+          # Count files to be uploaded
+          FILE_COUNT=$(find public -type f | wc -l)
+          echo "Found ${FILE_COUNT} files to sync"
+          
+          # Sync public directory to bucket root
+          b2 sync public/ b2://hamcall/ --delete
+          
+          # Calculate runtime
+          END_TIME=$(date +%s)
+          RUNTIME=$((END_TIME - START_TIME))
+          
+          # Set outputs for the notification step
+          echo "updated-files=${FILE_COUNT}" >> $GITHUB_OUTPUT
+          echo "run-time=${RUNTIME}s" >> $GITHUB_OUTPUT
         env:
           B2_KEYID: ${{ secrets.B2_KEYID }}
           B2_APPKEY: ${{ secrets.B2_APPKEY }}
