@@ -109,8 +109,15 @@ func (b b2) Write(calls *map[string]data.HamCall, osSigExit chan bool) error {
 	}
 
 	if ghActions == "true" {
-		fmt.Printf("::set-output name=updated-records::%d\n", *b.updated)
-		fmt.Printf("::set-output name=run-time::%s\n", time.Since(start))
+		// Write outputs to GitHub Actions output file
+		if githubOutput := os.Getenv("GITHUB_OUTPUT"); githubOutput != "" {
+			outputFile, err := os.OpenFile(githubOutput, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err == nil {
+				fmt.Fprintf(outputFile, "updated-records=%d\n", *b.updated)
+				fmt.Fprintf(outputFile, "run-time=%s\n", time.Since(start))
+				outputFile.Close()
+			}
+		}
 		fmt.Println("::endgroup::")
 	}
 
