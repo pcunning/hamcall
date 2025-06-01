@@ -1,0 +1,49 @@
+name: Deploy Static Assets
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install B2 CLI
+        run: |
+          pip install b2
+
+      - name: Deploy static assets
+        id: deploy_assets
+        run: |
+          # Authenticate with B2
+          b2 account authorize $B2_KEYID $B2_APPKEY
+          
+          # Record start time  
+          START_TIME=$(date +%s)
+          
+          # Count files to be uploaded
+          FILE_COUNT=$(find public -type f | wc -l)
+          echo "Found ${FILE_COUNT} files to sync"
+          
+          # Sync public directory to bucket root
+          b2 sync public/ b2://hamcall/
+          
+          # Calculate runtime
+          END_TIME=$(date +%s)
+          RUNTIME=$((END_TIME - START_TIME))
+          
+          # Set outputs for the notification step
+          echo "updated-files=${FILE_COUNT}" >> $GITHUB_OUTPUT
+          echo "run-time=${RUNTIME}s" >> $GITHUB_OUTPUT
+        env:
+          B2_KEYID: ${{ secrets.B2_KEYID }}
+          B2_APPKEY: ${{ secrets.B2_APPKEY }}
+
+      - name: Send deployment notification
+        run: |
+          curl -X POST --data-urlencode "payload={\"username\": \"Github Actions\", \"icon_url\": \"https://camo.githubusercontent.com/eeb25c8fe7d597494949032a0a1b2e79830bd8c69d5cc495efdb62fac04007c0/68747470733a2f2f63646e2e73766172756e2e6465762f67682f616374696f6e732e706e67\", \"attachments\": [{\"author_name\": \"hamcall.dev\", \"title\": \"static deploy result: ${{ job.status }}\", \"title_link\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\", \"text\": \"Updated ${{steps.deploy_assets.outputs.updated-files}} files in ${{steps.deploy_assets.outputs.run-time}}\"}]}" ${{ secrets.DISCORD_WEBHOOK }}
