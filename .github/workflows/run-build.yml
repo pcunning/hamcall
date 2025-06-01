@@ -17,9 +17,12 @@ jobs:
         with:
           go-version: 1.24.1
 
+      - name: Build
+        run: go build -o hamcall main.go
+
       - name: Run
         id: run_hamcall
-        run: go run main.go -dl -m=b2
+        run: ./hamcall -dl -m=b2
         env:
           B2_KEYID: ${{ secrets.B2_KEYID }}
           B2_APPKEY: ${{ secrets.B2_APPKEY }}
