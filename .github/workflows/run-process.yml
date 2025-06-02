@@ -13,7 +13,7 @@ jobs:
       - name: Download latest hamcall binary
         run: |
           # Get the latest release
-          LATEST_RELEASE=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r '.tag_name')
+          LATEST_RELEASE=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases" | jq -r 'map(select(.draft == false)) | sort_by(.published_at) | last | .tag_name')
           echo "Latest release: $LATEST_RELEASE"
           
           # Download the binary
