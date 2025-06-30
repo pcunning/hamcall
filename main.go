@@ -58,7 +58,7 @@ func main() {
 	}
 
 	calls := make(map[string]data.HamCall)
-	process(&calls)
+	redirections := process(&calls)
 	fmt.Printf("processing finished at %s\n", time.Since(start).String())
 
 	if *runMode == "b2" || *runMode == "stats" {
@@ -70,11 +70,11 @@ func main() {
 	}
 
 	if *runMode == "cli" || *runMode == "stats" {
-		cli(&calls)
+		cli(&calls, redirections)
 	}
 
 	if *runMode == "web" {
-		web(&calls, osSigExit)
+		web(&calls, redirections, osSigExit)
 	}
 
 	if *runMode == "sqlite" {
@@ -98,12 +98,13 @@ func downloadFiles() {
 	wg.Wait()
 }
 
-func process(calls *map[string]data.HamCall) {
-	uls.Process(calls)
+func process(calls *map[string]data.HamCall) *data.CallRedirections {
+	redirections := uls.Process(calls)
 	ised.Process(calls, "ised_data/amateur_delim.txt")
 	radioid.Process(calls)
 	lotw.Process(calls)
 	geo.Process(calls)
+	return redirections
 }
 
 func writeToB2(calls *map[string]data.HamCall, keyID, applicationKey string, uploadWorkers int, osSigExit chan bool, dryRun bool) {
@@ -121,7 +122,7 @@ func writeToB2(calls *map[string]data.HamCall, keyID, applicationKey string, upl
 	}
 }
 
-func cli(calls *map[string]data.HamCall) {
+func cli(calls *map[string]data.HamCall, redirections *data.CallRedirections) {
 	validate := func(input string) error {
 		var usCall = regexp.MustCompile(`^[AKNW][A-Z]{0,2}[0123456789][A-Z]{1,3}$`)
 
@@ -146,7 +147,17 @@ func cli(calls *map[string]data.HamCall) {
 			fmt.Printf("Prompt failed %v\n", err)
 			return
 		}
-		j, err := json.MarshalIndent((*calls)[strings.ToUpper(result)], "", "  ")
+		
+		requestedCall := strings.ToUpper(result)
+		actualCall := redirections.ResolveCallsign(requestedCall)
+		hamCall := (*calls)[actualCall]
+		
+		// Add a note if this was a redirection
+		if requestedCall != actualCall {
+			hamCall.Callsign = actualCall + " (redirected from " + requestedCall + ")"
+		}
+		
+		j, err := json.MarshalIndent(hamCall, "", "  ")
 		if err != nil {
 			log.Fatalf("error marshaling JSON: %v", err)
 		}
@@ -154,12 +165,22 @@ func cli(calls *map[string]data.HamCall) {
 	}
 }
 
-func web(calls *map[string]data.HamCall, osSigExit chan bool) {
+func web(calls *map[string]data.HamCall, redirections *data.CallRedirections, osSigExit chan bool) {
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		call := r.URL.Path[len("/") : len(r.URL.Path)-len(".json")]
+		requestedCall := r.URL.Path[len("/") : len(r.URL.Path)-len(".json")]
+		requestedCall = strings.ToUpper(requestedCall)
 		fmt.Printf("%s: %s\n", r.Method, r.URL.Path)
-		j, err := json.Marshal((*calls)[strings.ToUpper(call)])
+		
+		actualCall := redirections.ResolveCallsign(requestedCall)
+		hamCall := (*calls)[actualCall]
+		
+		// Add a note if this was a redirection
+		if requestedCall != actualCall {
+			hamCall.Callsign = actualCall + " (redirected from " + requestedCall + ")"
+		}
+		
+		j, err := json.Marshal(hamCall)
 		if err != nil {
 			// log.Fatalf(err.Error())
 		}

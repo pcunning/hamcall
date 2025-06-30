@@ -69,11 +69,14 @@ func DownloadApplications(wg *sync.WaitGroup) error {
 	return nil
 }
 
-func Process(calls *map[string]data.HamCall) {
+func Process(calls *map[string]data.HamCall) *data.CallRedirections {
+	redirections := data.NewCallRedirections()
 	ProcessAM(calls)
 	ProcessEN(calls)
 	ProcessHD(calls)
 	LoadFileNumbers(calls)
+	BuildCallRedirections(calls, redirections)
+	return redirections
 }
 
 func ProcessAM(calls *map[string]data.HamCall) {
@@ -299,4 +302,53 @@ func LoadFileNumbers(calls *map[string]data.HamCall) {
 
 	fmt.Printf(" ... %s\n", time.Since(start).String())
 
+}
+
+// BuildCallRedirections creates mappings from former callsigns to current callsigns
+func BuildCallRedirections(calls *map[string]data.HamCall, redirections *data.CallRedirections) {
+	start := time.Now()
+	fmt.Print("building call redirections")
+
+	// Build FRN to callsign mapping, keeping track of the most recent grant date
+	frnToCallsigns := make(map[string][]string)
+	callToGrantDate := make(map[string]string)
+
+	// Group callsigns by FRN and track grant dates
+	for callsign, hamCall := range *calls {
+		if hamCall.FRN != "" {
+			frnToCallsigns[hamCall.FRN] = append(frnToCallsigns[hamCall.FRN], callsign)
+			callToGrantDate[callsign] = hamCall.Grant
+		}
+	}
+
+	// For each FRN that has multiple callsigns, determine current vs former
+	for frn, callsigns := range frnToCallsigns {
+		if len(callsigns) > 1 {
+			// Find the callsign with the most recent grant date
+			var currentCall string
+			var mostRecentGrant string
+
+			for _, callsign := range callsigns {
+				grant := callToGrantDate[callsign]
+				if grant > mostRecentGrant {
+					mostRecentGrant = grant
+					currentCall = callsign
+				}
+			}
+
+			if currentCall != "" {
+				// Map this FRN to its current callsign
+				redirections.FRNToCurrentCall[frn] = currentCall
+
+				// Map all other callsigns for this FRN as former callsigns
+				for _, callsign := range callsigns {
+					if callsign != currentCall {
+						redirections.FormerCallToFRN[callsign] = frn
+					}
+				}
+			}
+		}
+	}
+
+	fmt.Printf(" ... %s (found %d former calls)\n", time.Since(start).String(), len(redirections.FormerCallToFRN))
 }
