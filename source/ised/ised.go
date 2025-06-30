@@ -3,7 +3,6 @@ package ised
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 	"sync"
@@ -18,12 +17,14 @@ func Download(wg *sync.WaitGroup) (string, error) {
 	fmt.Println("Downloading ISED (Canada) data")
 	err := downloader.FetchHttp("ised.zip", "https://apc-cap.ic.gc.ca/datafiles/amateur_delim.zip")
 	if err != nil {
-		log.Fatalf("Error downloading ISED (Canada) data: %v", err)
+		fmt.Printf("Warning: Error downloading ISED (Canada) data: %v\n", err)
+		return "", err
 	}
 
 	_, err = downloader.Unzip("ised.zip", "ised_data")
 	if err != nil {
-		log.Fatalf("Error unzipping ISED (Canada) data: %v", err)
+		fmt.Printf("Warning: Error unzipping ISED (Canada) data: %v\n", err)
+		return "", err
 	}
 
 	return "ised_data/amateur_delim.txt", nil

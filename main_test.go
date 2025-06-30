@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -136,5 +137,32 @@ func TestDownloadFilesFunction(t *testing.T) {
 	_ = downloadFiles
 	
 	// Skip actual execution to avoid network dependencies
-	t.Skip("Skipping actual download test to avoid network dependencies and log.Fatalf calls")
+	t.Skip("Skipping actual download test to avoid network dependencies")
+}
+
+// Test that processing continues when secondary files are missing
+func TestProcessingResilientToMissingSecondaryFiles(t *testing.T) {
+	// Create a temporary directory where secondary files don't exist
+	originalDir, _ := os.Getwd()
+	tempDir, _ := os.MkdirTemp("", "hamcall_resilience_test_*")
+	defer os.RemoveAll(tempDir)
+	
+	os.Chdir(tempDir)
+	defer os.Chdir(originalDir)
+
+	// Test that process() doesn't panic when secondary files are missing
+	calls := make(map[string]data.HamCall)
+	
+	// This should not panic even though secondary service files are missing
+	// The process functions handle missing files gracefully
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("process() function should handle missing files gracefully, but panicked: %v", r)
+		}
+	}()
+	
+	process(&calls)
+	
+	// If we get here without panic, the resilience test passes
+	// The calls map will be empty since no files exist, but that's expected behavior
 }

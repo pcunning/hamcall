@@ -4,7 +4,6 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"strconv"
 	"sync"
@@ -19,7 +18,8 @@ func Download(wg *sync.WaitGroup) error {
 	fmt.Println("Downloading radioid data")
 	err := downloader.FetchHttp("dmrid.dat", "https://www.radioid.net/static/dmrid.dat")
 	if err != nil {
-		log.Fatalf("Error downloading RadioID data: %v", err)
+		fmt.Printf("Warning: Error downloading RadioID data: %v\n", err)
+		return err
 	}
 	return nil
 }
