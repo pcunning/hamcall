@@ -25,7 +25,7 @@ func TestBuildCallRedirections(t *testing.T) {
 	calls["WW0CJ"] = data.HamCall{
 		Callsign: "WW0CJ",
 		FRN:      testFRN,
-		Grant:    "01/01/2020",
+		Grant:    "12/31/2020",
 		Name:     "John Smith",
 	}
 

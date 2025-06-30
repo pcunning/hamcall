@@ -309,16 +309,31 @@ func BuildCallRedirections(calls *map[string]data.HamCall, redirections *data.Ca
 	start := time.Now()
 	fmt.Print("building call redirections")
 
-	// Build FRN to callsign mapping, keeping track of the most recent grant date
+	// Build FRN to callsign mapping
 	frnToCallsigns := make(map[string][]string)
-	callToGrantDate := make(map[string]string)
 
-	// Group callsigns by FRN and track grant dates
+	// Group callsigns by FRN
 	for callsign, hamCall := range *calls {
 		if hamCall.FRN != "" {
 			frnToCallsigns[hamCall.FRN] = append(frnToCallsigns[hamCall.FRN], callsign)
-			callToGrantDate[callsign] = hamCall.Grant
 		}
+	}
+
+	// Helper function to parse MM/DD/YYYY date format for comparison
+	parseDate := func(dateStr string) time.Time {
+		if dateStr == "" {
+			return time.Time{}
+		}
+		// Try MM/DD/YYYY format first
+		if t, err := time.Parse("01/02/2006", dateStr); err == nil {
+			return t
+		}
+		// Try MM/DD/YY format
+		if t, err := time.Parse("01/02/06", dateStr); err == nil {
+			return t
+		}
+		// Return zero time if parsing fails
+		return time.Time{}
 	}
 
 	// For each FRN that has multiple callsigns, determine current vs former
@@ -326,11 +341,11 @@ func BuildCallRedirections(calls *map[string]data.HamCall, redirections *data.Ca
 		if len(callsigns) > 1 {
 			// Find the callsign with the most recent grant date
 			var currentCall string
-			var mostRecentGrant string
+			var mostRecentGrant time.Time
 
 			for _, callsign := range callsigns {
-				grant := callToGrantDate[callsign]
-				if grant > mostRecentGrant {
+				grant := parseDate((*calls)[callsign].Grant)
+				if grant.After(mostRecentGrant) {
 					mostRecentGrant = grant
 					currentCall = callsign
 				}
