@@ -18,13 +18,18 @@ import (
 func Download(wg *sync.WaitGroup) error {
 	defer wg.Done()
 
-	// Daily files for future reference
-	// https: //data.fcc.gov/download/pub/uls/daily/a_am_sun.zip
-	// https: //data.fcc.gov/download/pub/uls/daily/l_am_sun.zip
+	// Check if we should use daily files
+	useDailyFiles := os.Getenv("ULS_USE_DAILY") == "true"
 
-	wg.Add(2)
-	go DownloadLicenses(wg)
-	go DownloadApplications(wg)
+	if useDailyFiles {
+		wg.Add(2)
+		go DownloadDailyLicenses(wg)
+		go DownloadDailyApplications(wg)
+	} else {
+		wg.Add(2)
+		go DownloadLicenses(wg)
+		go DownloadApplications(wg)
+	}
 
 	return nil
 }
@@ -67,6 +72,96 @@ func DownloadApplications(wg *sync.WaitGroup) error {
 	fmt.Println("Unzipped:\n" + strings.Join(files, "\n"))
 
 	return nil
+}
+
+func DownloadDailyLicenses(wg *sync.WaitGroup) error {
+	defer wg.Done()
+
+	fmt.Println("Downloading ULS Daily License data")
+
+	// Get current day of week in lowercase (sun, mon, tue, etc.)
+	day := time.Now().Format("Mon")
+	day = strings.ToLower(day[:3])
+
+	dailyUrl := fmt.Sprintf("https://data.fcc.gov/download/pub/uls/daily/l_am_%s.zip", day)
+	dailyFileName := fmt.Sprintf("l_am_%s.zip", day)
+
+	err := downloader.FetchHttp(dailyFileName, dailyUrl)
+	if err != nil {
+		fmt.Printf("Failed to download daily license file, falling back to weekly: %v\n", err)
+		// Don't defer wg.Done() since we already deferred it above
+		wg.Add(1)
+		return DownloadLicenses(wg)
+	}
+
+	files, err := downloader.Unzip(dailyFileName, "l_amat")
+	if err != nil {
+		fmt.Printf("Failed to unzip daily license file, falling back to weekly: %v\n", err)
+		wg.Add(1)
+		return DownloadLicenses(wg)
+	}
+
+	// Check if daily files contain essential data
+	if !dailyFilesContainEssentialData("l_amat") {
+		fmt.Println("Daily files missing essential data, downloading weekly files...")
+		wg.Add(1)
+		return DownloadLicenses(wg)
+	}
+
+	fmt.Println("Daily License files unzipped:\n" + strings.Join(files, "\n"))
+	return nil
+}
+
+func DownloadDailyApplications(wg *sync.WaitGroup) error {
+	defer wg.Done()
+
+	fmt.Println("Downloading ULS Daily Application data")
+
+	// Get current day of week in lowercase (sun, mon, tue, etc.)
+	day := time.Now().Format("Mon")
+	day = strings.ToLower(day[:3])
+
+	dailyUrl := fmt.Sprintf("https://data.fcc.gov/download/pub/uls/daily/a_am_%s.zip", day)
+	dailyFileName := fmt.Sprintf("a_am_%s.zip", day)
+
+	err := downloader.FetchHttp(dailyFileName, dailyUrl)
+	if err != nil {
+		fmt.Printf("Failed to download daily application file, falling back to weekly: %v\n", err)
+		wg.Add(1)
+		return DownloadApplications(wg)
+	}
+
+	files, err := downloader.Unzip(dailyFileName, "a_amat")
+	if err != nil {
+		fmt.Printf("Failed to unzip daily application file, falling back to weekly: %v\n", err)
+		wg.Add(1)
+		return DownloadApplications(wg)
+	}
+
+	fmt.Println("Daily Application files unzipped:\n" + strings.Join(files, "\n"))
+	return nil
+}
+
+func dailyFilesContainEssentialData(dir string) bool {
+	// Check if essential files exist and have content
+	essentialFiles := []string{"AM.dat", "EN.dat", "HD.dat"}
+	
+	for _, filename := range essentialFiles {
+		filepath := dir + "/" + filename
+		if _, err := os.Stat(filepath); os.IsNotExist(err) {
+			fmt.Printf("Essential file %s missing from daily download\n", filename)
+			return false
+		}
+		
+		// Check if file has content
+		info, err := os.Stat(filepath)
+		if err != nil || info.Size() == 0 {
+			fmt.Printf("Essential file %s is empty or unreadable\n", filename)
+			return false
+		}
+	}
+	
+	return true
 }
 
 func Process(calls *map[string]data.HamCall) {

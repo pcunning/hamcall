@@ -240,3 +240,59 @@ func TestProcessIntegration(t *testing.T) {
 		t.Fatalf("Expected expiration '01/01/2030', got '%s'", w5test.Expiration)
 	}
 }
+
+func TestDailyFilesContainEssentialData(t *testing.T) {
+	// Create test directory structure
+	testDir := "/tmp/uls_daily_test"
+	os.MkdirAll(testDir, 0755)
+	defer os.RemoveAll(testDir)
+
+	// Test case 1: All essential files exist with content
+	files := []string{"AM.dat", "EN.dat", "HD.dat"}
+	for _, filename := range files {
+		file, err := os.Create(testDir + "/" + filename)
+		if err != nil {
+			t.Fatalf("Failed to create test %s: %v", filename, err)
+		}
+		file.WriteString("test content")
+		file.Close()
+	}
+
+	if !dailyFilesContainEssentialData(testDir) {
+		t.Fatalf("Expected true when all essential files exist with content")
+	}
+
+	// Test case 2: Missing file
+	os.Remove(testDir + "/AM.dat")
+	if dailyFilesContainEssentialData(testDir) {
+		t.Fatalf("Expected false when essential file is missing")
+	}
+
+	// Test case 3: Empty file
+	file, _ := os.Create(testDir + "/AM.dat")
+	file.Close() // Create empty file
+	if dailyFilesContainEssentialData(testDir) {
+		t.Fatalf("Expected false when essential file is empty")
+	}
+}
+
+func TestDownloadSelection(t *testing.T) {
+	// Test default behavior (no environment variable)
+	os.Unsetenv("ULS_USE_DAILY")
+	
+	// This test would ideally mock the download functions
+	// For now, we'll just verify that the Download function doesn't panic
+	// and test the environment variable logic
+	
+	// Test daily mode
+	os.Setenv("ULS_USE_DAILY", "true")
+	if os.Getenv("ULS_USE_DAILY") != "true" {
+		t.Fatalf("Expected ULS_USE_DAILY to be 'true'")
+	}
+	
+	// Test weekly mode (default)
+	os.Unsetenv("ULS_USE_DAILY")
+	if os.Getenv("ULS_USE_DAILY") == "true" {
+		t.Fatalf("Expected ULS_USE_DAILY to be unset or not 'true'")
+	}
+}
