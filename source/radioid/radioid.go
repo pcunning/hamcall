@@ -24,7 +24,7 @@ func Download(wg *sync.WaitGroup) error {
 	return nil
 }
 
-func Process(calls *map[string]data.HamCall) {
+func Process(calls *map[string]data.HamCall, partialMode bool) {
 	start := time.Now()
 	fmt.Print("processing radioID")
 
@@ -56,15 +56,18 @@ func Process(calls *map[string]data.HamCall) {
 		call := record[1]
 		item, c := (*calls)[call]
 		if c {
+			// Update existing callsign
 			item.DMRID = append(item.DMRID, id)
-		} else {
+			(*calls)[call] = item
+		} else if !partialMode {
+			// Only create new callsign if not in partial mode
 			item = data.HamCall{
 				Callsign: call,
 				DMRID:    []int{id},
 			}
-
+			(*calls)[call] = item
 		}
-		(*calls)[call] = item
+		// In partial mode, skip callsigns that don't exist in ULS data
 	}
 	fmt.Printf(" ... %s\n", time.Since(start).String())
 }

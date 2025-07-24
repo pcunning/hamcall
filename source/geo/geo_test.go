@@ -41,7 +41,7 @@ N0DEF,Bob Wilson,Bob,Wilson,789 Pine Rd,Nowhere,FL,98765,US,25.5,-80.25,EL95ab`
 
 	// Test processing
 	calls := make(map[string]data.HamCall)
-	Process(&calls)
+	Process(&calls, false)
 
 	// Verify results - should be 3 calls (header is skipped due to invalid coordinates)
 	if len(calls) != 3 {
@@ -141,7 +141,7 @@ W5TEST,John Smith,John,Smith,123 Main St,Anytown,TX,12345,US,32.5,-97.0,EM12ab`
 	}
 
 	// Test processing
-	Process(&calls)
+	Process(&calls, false)
 
 	// Verify results - should have 1 call (header skipped due to invalid coordinates)
 	if len(calls) != 1 {
@@ -204,7 +204,7 @@ N0DEF,Bob Wilson,Bob,Wilson,789 Pine Rd,Nowhere,FL,98765,US,25.5,-80.25,EL95ab`
 
 	// Test processing
 	calls := make(map[string]data.HamCall)
-	Process(&calls)
+	Process(&calls, false)
 
 	// Should only process valid records - only N0DEF (header, W5TEST and KC5ABC have invalid coords)
 	if len(calls) != 1 {
@@ -247,7 +247,7 @@ func TestGeoProcessMissingFile(t *testing.T) {
 	calls := make(map[string]data.HamCall)
 	
 	// This should not panic or error, just return without processing
-	Process(&calls)
+	Process(&calls, false)
 	
 	// Should have no calls since file doesn't exist
 	if len(calls) != 0 {

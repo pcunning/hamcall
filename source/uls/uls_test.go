@@ -278,21 +278,54 @@ func TestDailyFilesContainEssentialData(t *testing.T) {
 
 func TestDownloadSelection(t *testing.T) {
 	// Test default behavior (no environment variable)
-	os.Unsetenv("ULS_USE_DAILY")
+	os.Unsetenv("ULS_MODE")
 	
-	// This test would ideally mock the download functions
-	// For now, we'll just verify that the Download function doesn't panic
-	// and test the environment variable logic
+	// Test partial mode
+	os.Setenv("ULS_MODE", "partial")
+	if os.Getenv("ULS_MODE") != "partial" {
+		t.Fatalf("Expected ULS_MODE to be 'partial'")
+	}
 	
-	// Test daily mode
-	os.Setenv("ULS_USE_DAILY", "true")
-	if os.Getenv("ULS_USE_DAILY") != "true" {
-		t.Fatalf("Expected ULS_USE_DAILY to be 'true'")
+	// Test full mode
+	os.Setenv("ULS_MODE", "full")
+	if os.Getenv("ULS_MODE") != "full" {
+		t.Fatalf("Expected ULS_MODE to be 'full'")
 	}
 	
 	// Test weekly mode (default)
-	os.Unsetenv("ULS_USE_DAILY")
-	if os.Getenv("ULS_USE_DAILY") == "true" {
-		t.Fatalf("Expected ULS_USE_DAILY to be unset or not 'true'")
+	os.Unsetenv("ULS_MODE")
+	if os.Getenv("ULS_MODE") == "partial" || os.Getenv("ULS_MODE") == "full" {
+		t.Fatalf("Expected ULS_MODE to be unset")
+	}
+}
+
+func TestGetPreviousBusinessDay(t *testing.T) {
+	// Test that the function returns a valid day code
+	day := getPreviousBusinessDay()
+	validDays := []string{"mon", "tue", "wed", "thu", "fri"}
+	
+	isValid := false
+	for _, validDay := range validDays {
+		if day == validDay {
+			isValid = true
+			break
+		}
+	}
+	
+	if !isValid {
+		t.Fatalf("Expected valid business day, got '%s'", day)
+	}
+}
+
+func TestGetAllDailysSinceWeekly(t *testing.T) {
+	days := getAllDailysSinceWeekly()
+	
+	// Should only return business days
+	validDays := map[string]bool{"mon": true, "tue": true, "wed": true, "thu": true, "fri": true}
+	
+	for _, day := range days {
+		if !validDays[day] {
+			t.Fatalf("Expected only business days, got '%s'", day)
+		}
 	}
 }

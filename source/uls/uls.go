@@ -18,14 +18,22 @@ import (
 func Download(wg *sync.WaitGroup) error {
 	defer wg.Done()
 
-	// Check if we should use daily files
-	useDailyFiles := os.Getenv("ULS_USE_DAILY") == "true"
+	// Check the ULS processing mode
+	ulsMode := os.Getenv("ULS_MODE")
 
-	if useDailyFiles {
+	switch ulsMode {
+	case "partial":
 		wg.Add(2)
 		go DownloadDailyLicenses(wg)
 		go DownloadDailyApplications(wg)
-	} else {
+	case "full":
+		wg.Add(4)
+		go DownloadLicenses(wg)
+		go DownloadApplications(wg)
+		go DownloadDailyLicenses(wg)
+		go DownloadDailyApplications(wg)
+	default:
+		// Default to weekly processing
 		wg.Add(2)
 		go DownloadLicenses(wg)
 		go DownloadApplications(wg)
@@ -74,71 +82,214 @@ func DownloadApplications(wg *sync.WaitGroup) error {
 	return nil
 }
 
+// getPreviousBusinessDay returns the day code for the most recent business day with daily files
+// Daily files are published the day after, so Monday's file is available on Tuesday after noon
+func getPreviousBusinessDay() string {
+	now := time.Now()
+	
+	// Get yesterday's day
+	yesterday := now.AddDate(0, 0, -1)
+	dayOfWeek := yesterday.Weekday()
+	
+	// Handle weekends - if yesterday was Sunday or Saturday, get Friday
+	switch dayOfWeek {
+	case time.Sunday:
+		// Yesterday was Sunday, get Friday's file (2 days back)
+		yesterday = yesterday.AddDate(0, 0, -2)
+	case time.Saturday:
+		// Yesterday was Saturday, get Friday's file (1 day back)
+		yesterday = yesterday.AddDate(0, 0, -1)
+	}
+	
+	// Convert to 3-letter lowercase day code
+	day := yesterday.Format("Mon")
+	return strings.ToLower(day[:3])
+}
+
+// getAllDailysSinceWeekly returns all day codes for daily files since the last weekly
+// Weekly files are published on Sunday, so get Monday through the previous business day
+func getAllDailysSinceWeekly() []string {
+	var days []string
+	now := time.Now()
+	
+	// Find the most recent Sunday (when weekly was published)
+	daysBack := int(now.Weekday())
+	if daysBack == 0 {
+		daysBack = 7 // If today is Sunday, go back to previous Sunday
+	}
+	lastSunday := now.AddDate(0, 0, -daysBack)
+	
+	// Collect all business days from Monday after last Sunday to yesterday
+	for d := lastSunday.AddDate(0, 0, 1); d.Before(now); d = d.AddDate(0, 0, 1) {
+		if d.Weekday() != time.Saturday && d.Weekday() != time.Sunday {
+			dayStr := d.Format("Mon")
+			days = append(days, strings.ToLower(dayStr[:3]))
+		}
+	}
+	
+	return days
+}
 func DownloadDailyLicenses(wg *sync.WaitGroup) error {
 	defer wg.Done()
 
-	fmt.Println("Downloading ULS Daily License data")
-
-	// Get current day of week in lowercase (sun, mon, tue, etc.)
-	day := time.Now().Format("Mon")
-	day = strings.ToLower(day[:3])
-
-	dailyUrl := fmt.Sprintf("https://data.fcc.gov/download/pub/uls/daily/l_am_%s.zip", day)
-	dailyFileName := fmt.Sprintf("l_am_%s.zip", day)
-
-	err := downloader.FetchHttp(dailyFileName, dailyUrl)
-	if err != nil {
-		fmt.Printf("Failed to download daily license file, falling back to weekly: %v\n", err)
-		// Don't defer wg.Done() since we already deferred it above
-		wg.Add(1)
-		return DownloadLicenses(wg)
+	ulsMode := os.Getenv("ULS_MODE")
+	var daysToDownload []string
+	
+	if ulsMode == "full" {
+		fmt.Println("Downloading ULS Daily License data (full mode - all dailies since weekly)")
+		daysToDownload = getAllDailysSinceWeekly()
+		if len(daysToDownload) == 0 {
+			fmt.Println("No daily files to download in full mode")
+			return nil
+		}
+	} else {
+		fmt.Println("Downloading ULS Daily License data (partial mode)")
+		day := getPreviousBusinessDay()
+		daysToDownload = []string{day}
 	}
 
-	files, err := downloader.Unzip(dailyFileName, "l_amat")
-	if err != nil {
-		fmt.Printf("Failed to unzip daily license file, falling back to weekly: %v\n", err)
-		wg.Add(1)
-		return DownloadLicenses(wg)
+	for _, day := range daysToDownload {
+		dailyUrl := fmt.Sprintf("ftp://wirelessftp.fcc.gov:21/pub/uls/daily/l_am_%s.zip", day)
+		dailyFileName := fmt.Sprintf("l_am_%s.zip", day)
+
+		fmt.Printf("Downloading daily license file for %s...\n", day)
+		err := downloader.FetchFtp(dailyFileName, dailyUrl)
+		if err != nil {
+			fmt.Printf("Failed to download daily license file for %s, skipping: %v\n", day, err)
+			continue
+		}
+
+		// For full mode, extract to separate directory per day, then merge
+		extractDir := "l_amat"
+		if ulsMode == "full" {
+			extractDir = fmt.Sprintf("l_amat_daily_%s", day)
+		}
+
+		files, err := downloader.Unzip(dailyFileName, extractDir)
+		if err != nil {
+			fmt.Printf("Failed to unzip daily license file for %s, skipping: %v\n", day, err)
+			continue
+		}
+
+		fmt.Printf("Daily License files for %s unzipped:\n%s\n", day, strings.Join(files, "\n"))
 	}
 
-	// Check if daily files contain essential data
-	if !dailyFilesContainEssentialData("l_amat") {
-		fmt.Println("Daily files missing essential data, downloading weekly files...")
-		wg.Add(1)
-		return DownloadLicenses(wg)
+	// For partial mode, check if daily files contain essential data and fallback if needed
+	if ulsMode == "partial" {
+		if !dailyFilesContainEssentialData("l_amat") {
+			fmt.Println("Daily files missing essential data, downloading weekly files...")
+			wg.Add(1)
+			return DownloadLicenses(wg)
+		}
 	}
 
-	fmt.Println("Daily License files unzipped:\n" + strings.Join(files, "\n"))
+	// For full mode, merge all daily files with the weekly files
+	if ulsMode == "full" {
+		err := mergeDailyFiles("l_amat", daysToDownload, "license")
+		if err != nil {
+			fmt.Printf("Failed to merge daily license files: %v\n", err)
+		}
+	}
+
 	return nil
 }
 
 func DownloadDailyApplications(wg *sync.WaitGroup) error {
 	defer wg.Done()
 
-	fmt.Println("Downloading ULS Daily Application data")
-
-	// Get current day of week in lowercase (sun, mon, tue, etc.)
-	day := time.Now().Format("Mon")
-	day = strings.ToLower(day[:3])
-
-	dailyUrl := fmt.Sprintf("https://data.fcc.gov/download/pub/uls/daily/a_am_%s.zip", day)
-	dailyFileName := fmt.Sprintf("a_am_%s.zip", day)
-
-	err := downloader.FetchHttp(dailyFileName, dailyUrl)
-	if err != nil {
-		fmt.Printf("Failed to download daily application file, falling back to weekly: %v\n", err)
-		wg.Add(1)
-		return DownloadApplications(wg)
+	ulsMode := os.Getenv("ULS_MODE")
+	var daysToDownload []string
+	
+	if ulsMode == "full" {
+		fmt.Println("Downloading ULS Daily Application data (full mode - all dailies since weekly)")
+		daysToDownload = getAllDailysSinceWeekly()
+		if len(daysToDownload) == 0 {
+			fmt.Println("No daily application files to download in full mode")
+			return nil
+		}
+	} else {
+		fmt.Println("Downloading ULS Daily Application data (partial mode)")
+		day := getPreviousBusinessDay()
+		daysToDownload = []string{day}
 	}
 
-	files, err := downloader.Unzip(dailyFileName, "a_amat")
-	if err != nil {
-		fmt.Printf("Failed to unzip daily application file, falling back to weekly: %v\n", err)
-		wg.Add(1)
-		return DownloadApplications(wg)
+	for _, day := range daysToDownload {
+		dailyUrl := fmt.Sprintf("ftp://wirelessftp.fcc.gov:21/pub/uls/daily/a_am_%s.zip", day)
+		dailyFileName := fmt.Sprintf("a_am_%s.zip", day)
+
+		fmt.Printf("Downloading daily application file for %s...\n", day)
+		err := downloader.FetchFtp(dailyFileName, dailyUrl)
+		if err != nil {
+			fmt.Printf("Failed to download daily application file for %s, skipping: %v\n", day, err)
+			continue
+		}
+
+		// For full mode, extract to separate directory per day, then merge
+		extractDir := "a_amat"
+		if ulsMode == "full" {
+			extractDir = fmt.Sprintf("a_amat_daily_%s", day)
+		}
+
+		files, err := downloader.Unzip(dailyFileName, extractDir)
+		if err != nil {
+			fmt.Printf("Failed to unzip daily application file for %s, skipping: %v\n", day, err)
+			continue
+		}
+
+		fmt.Printf("Daily Application files for %s unzipped:\n%s\n", day, strings.Join(files, "\n"))
 	}
 
-	fmt.Println("Daily Application files unzipped:\n" + strings.Join(files, "\n"))
+	// For full mode, merge all daily files with the weekly files
+	if ulsMode == "full" {
+		err := mergeDailyFiles("a_amat", daysToDownload, "application")
+		if err != nil {
+			fmt.Printf("Failed to merge daily application files: %v\n", err)
+		}
+	}
+
+	return nil
+}
+
+// mergeDailyFiles merges daily files with weekly files in full mode
+func mergeDailyFiles(baseDir string, days []string, fileType string) error {
+	essentialFiles := []string{"AM.dat", "EN.dat", "HD.dat"}
+	if fileType == "application" {
+		essentialFiles = []string{"EN.dat", "HS.dat"}
+	}
+	
+	for _, filename := range essentialFiles {
+		baseFile := baseDir + "/" + filename
+		
+		// Open base file for appending
+		baseFileHandle, err := os.OpenFile(baseFile, os.O_APPEND|os.O_WRONLY, 0644)
+		if err != nil {
+			fmt.Printf("Warning: Could not open base file %s for appending: %v\n", baseFile, err)
+			continue
+		}
+		defer baseFileHandle.Close()
+		
+		// Append each daily file
+		for _, day := range days {
+			dailyFile := fmt.Sprintf("%s_daily_%s/%s", baseDir, day, filename)
+			
+			dailyFileHandle, err := os.Open(dailyFile)
+			if err != nil {
+				fmt.Printf("Warning: Could not open daily file %s: %v\n", dailyFile, err)
+				continue
+			}
+			
+			// Copy daily file content to base file
+			_, err = io.Copy(baseFileHandle, dailyFileHandle)
+			dailyFileHandle.Close()
+			
+			if err != nil {
+				fmt.Printf("Warning: Could not merge daily file %s: %v\n", dailyFile, err)
+			} else {
+				fmt.Printf("Merged daily file %s into %s\n", dailyFile, baseFile)
+			}
+		}
+	}
+	
 	return nil
 }
 
