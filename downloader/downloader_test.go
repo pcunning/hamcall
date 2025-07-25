@@ -66,8 +66,8 @@ func TestFetchHttpInvalidURL(t *testing.T) {
 	os.Chdir(tempDir)
 	defer os.Chdir(originalDir)
 
-	// Test with invalid URL
-	err = FetchHttp("test.txt", "http://invalid-url-that-does-not-exist.com")
+	// Test with invalid URL - use an invalid scheme and malformed URL
+	err = FetchHttp("test.txt", "://invalid-malformed-url")
 	if err == nil {
 		t.Fatalf("Expected error for invalid URL, got nil")
 	}
