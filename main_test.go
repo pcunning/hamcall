@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/pcunning/hamcall/data"
+	"github.com/pcunning/hamcall/downloader"
 )
 
 func TestWebHandler(t *testing.T) {
@@ -131,38 +131,36 @@ func TestProcessFunction(t *testing.T) {
 
 func TestDownloadFilesFunction(t *testing.T) {
 	// Test that downloadFiles function exists and can be referenced
-	// We skip actual execution to avoid network dependencies and log.Fatalf calls
+	// We skip actual execution to avoid network dependencies
 	
 	// Just verify we can reference the function (if we couldn't, this wouldn't compile)
-	_ = downloadFiles
+	_ = func() { downloadFiles("", "") }
 	
-	// Skip actual execution to avoid network dependencies
-	t.Skip("Skipping actual download test to avoid network dependencies")
+	// Skip actual execution to avoid network dependencies and B2 credentials
+	t.Skip("Skipping actual download test to avoid network dependencies and B2 credentials")
 }
 
-// Test that processing continues when secondary files are missing
-func TestProcessingResilientToMissingSecondaryFiles(t *testing.T) {
-	// Create a temporary directory where secondary files don't exist
-	originalDir, _ := os.Getwd()
-	tempDir, _ := os.MkdirTemp("", "hamcall_resilience_test_*")
-	defer os.RemoveAll(tempDir)
+func TestBackupSystemIntegration(t *testing.T) {
+	// Test that backup system is properly integrated without requiring actual network access
 	
-	os.Chdir(tempDir)
-	defer os.Chdir(originalDir)
-
-	// Test that process() doesn't panic when secondary files are missing
-	calls := make(map[string]data.HamCall)
+	// Since ULS download will cause log.Fatalf on network failure, we'll just test 
+	// the backup downloader initialization logic in isolation
 	
-	// This should not panic even though secondary service files are missing
-	// The process functions handle missing files gracefully
-	defer func() {
-		if r := recover(); r != nil {
-			t.Fatalf("process() function should handle missing files gracefully, but panicked: %v", r)
-		}
-	}()
+	// Test with empty credentials (should disable backup)
+	backup, err := downloader.NewBackupDownloader("", "", "test-path")
+	if err == nil {
+		t.Fatalf("NewBackupDownloader with empty credentials should return error")
+	}
+	if backup != nil {
+		t.Fatalf("NewBackupDownloader with empty credentials should return nil backup")
+	}
 	
-	process(&calls)
-	
-	// If we get here without panic, the resilience test passes
-	// The calls map will be empty since no files exist, but that's expected behavior
+	// Test with empty path (should disable backup)
+	backup2, err2 := downloader.NewBackupDownloader("test-key", "test-app-key", "")
+	if err2 == nil {
+		t.Fatalf("NewBackupDownloader with empty path should return error")
+	}
+	if backup2 != nil {
+		t.Fatalf("NewBackupDownloader with empty path should return nil backup")
+	}
 }

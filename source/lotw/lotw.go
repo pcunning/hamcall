@@ -12,10 +12,17 @@ import (
 	"github.com/pcunning/hamcall/downloader"
 )
 
-func Download(wg *sync.WaitGroup) error {
+func Download(wg *sync.WaitGroup, backup *downloader.BackupDownloader) error {
 	defer wg.Done()
 	fmt.Println("Downloading lotw data")
-	err := downloader.FetchHttp("lotw.csv", "https://lotw.arrl.org/lotw-user-activity.csv")
+	
+	var err error
+	if backup != nil {
+		err = downloader.FetchWithBackup("lotw.csv", "https://lotw.arrl.org/lotw-user-activity.csv", "lotw.csv", backup)
+	} else {
+		err = downloader.FetchHttp("lotw.csv", "https://lotw.arrl.org/lotw-user-activity.csv")
+	}
+	
 	if err != nil {
 		fmt.Printf("Warning: Error downloading LOTW data: %v\n", err)
 		return err

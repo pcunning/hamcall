@@ -12,10 +12,17 @@ import (
 	"github.com/pcunning/hamcall/downloader"
 )
 
-func Download(wg *sync.WaitGroup) (string, error) {
+func Download(wg *sync.WaitGroup, backup *downloader.BackupDownloader) (string, error) {
 	defer wg.Done()
 	fmt.Println("Downloading ISED (Canada) data")
-	err := downloader.FetchHttp("ised.zip", "https://apc-cap.ic.gc.ca/datafiles/amateur_delim.zip")
+	
+	var err error
+	if backup != nil {
+		err = downloader.FetchWithBackup("ised.zip", "https://apc-cap.ic.gc.ca/datafiles/amateur_delim.zip", "ised.zip", backup)
+	} else {
+		err = downloader.FetchHttp("ised.zip", "https://apc-cap.ic.gc.ca/datafiles/amateur_delim.zip")
+	}
+	
 	if err != nil {
 		fmt.Printf("Warning: Error downloading ISED (Canada) data: %v\n", err)
 		return "", err

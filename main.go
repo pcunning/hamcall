@@ -20,6 +20,7 @@ import (
 	"github.com/manifoldco/promptui"
 	"github.com/pcunning/hamcall/b2"
 	"github.com/pcunning/hamcall/data"
+	"github.com/pcunning/hamcall/downloader"
 	"github.com/pcunning/hamcall/source/geo"
 	"github.com/pcunning/hamcall/source/ised"
 	"github.com/pcunning/hamcall/source/lotw"
@@ -50,7 +51,7 @@ func main() {
 	uploadWorkers := 200
 
 	if *downloadDataFiles {
-		downloadFiles()
+		downloadFiles(keyID, applicationKey)
 		fmt.Printf("download finished at %s\n", time.Since(start).String())
 
 	} else {
@@ -84,29 +85,43 @@ func main() {
 	fmt.Printf("total runtime %s\n", time.Since(start).String())
 }
 
-func downloadFiles() {
+func downloadFiles(keyID, applicationKey string) {
 	var wg sync.WaitGroup
+
+	// Create backup downloader if configured
+	backupPath := os.Getenv("BACKUP_PATH")
+	var backup *downloader.BackupDownloader
+	if backupPath != "" && keyID != "" && applicationKey != "" {
+		var err error
+		backup, err = downloader.NewBackupDownloader(keyID, applicationKey, backupPath)
+		if err != nil {
+			fmt.Printf("Warning: Failed to initialize backup downloader: %v\n", err)
+			backup = nil
+		} else {
+			fmt.Printf("Backup system enabled with path: %s\n", backupPath)
+		}
+	}
 
 	wg.Add(5)
 
 	go uls.Download(&wg)
 	go func() {
-		if _, err := ised.Download(&wg); err != nil {
+		if _, err := ised.Download(&wg, backup); err != nil {
 			fmt.Printf("Continuing without ISED data due to download failure\n")
 		}
 	}()
 	go func() {
-		if err := radioid.Download(&wg); err != nil {
+		if err := radioid.Download(&wg, backup); err != nil {
 			fmt.Printf("Continuing without RadioID data due to download failure\n")
 		}
 	}()
 	go func() {
-		if err := lotw.Download(&wg); err != nil {
+		if err := lotw.Download(&wg, backup); err != nil {
 			fmt.Printf("Continuing without LOTW data due to download failure\n")
 		}
 	}()
 	go func() {
-		if err := geo.Download(&wg); err != nil {
+		if err := geo.Download(&wg, backup); err != nil {
 			fmt.Printf("Continuing without GEO data due to download failure\n")
 		}
 	}()
