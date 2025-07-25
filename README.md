@@ -44,3 +44,40 @@ Since the hangup is moving the files to the CDN the next step was to write them 
 - LOTW https://lotw.arrl.org/
 - RadioID https://www.radioid.net/
 - Location https://haminfo.tetranz.com
+
+## Backup System
+
+The application includes a backup system for secondary data sources to ensure resilient processing even when external services are unavailable (such as during ARRL LOTW maintenance).
+
+### Configuration
+
+Set the `BACKUP_PATH` environment variable to enable backup functionality:
+
+```bash
+export BACKUP_PATH="backups"  # Path in B2 bucket where backup files are stored
+export B2_KEYID="your_b2_key_id"
+export B2_APPKEY="your_b2_application_key"
+```
+
+### How It Works
+
+1. **Primary Download**: The system first attempts to download from the original source
+2. **Backup on Success**: If successful, the file is automatically uploaded to the backup path in B2
+3. **Fallback on Failure**: If the primary source fails, the system attempts to download from the backup
+4. **Graceful Degradation**: If both primary and backup fail, processing continues without that data source
+
+### Behavior by Service
+
+- **ULS (Primary)**: Always required - fatal error if unavailable
+- **LOTW, RadioID, GEO, ISED (Secondary)**: Resilient with backup system - warnings on failure but processing continues
+
+### Example Output
+
+```
+Backup system enabled with path: backups
+Downloading lotw data
+Primary download failed for lotw.csv, trying backup...
+Successfully downloaded lotw.csv from backup
+Warning: Error downloading GEO data: connection refused
+Continuing without GEO data due to download failure
+```
