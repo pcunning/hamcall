@@ -1,13 +1,14 @@
-name: Weekly Data Update
+name: Weekly Full Data Update
 
 on:
   schedule:
+    # Run full update every Monday at midnight UTC
     # https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows
     - cron: "0 0 * * 1"
   workflow_dispatch:
 
 jobs:
-  update:
+  full-update:
     runs-on: ubuntu-latest
     steps:
       - name: Download latest hamcall binary
@@ -30,4 +31,4 @@ jobs:
 
       - name: Send workflow notification
         run: |
-          curl -X POST --data-urlencode "payload={\"username\": \"Github Actions\", \"icon_url\": \"https://camo.githubusercontent.com/eeb25c8fe7d597494949032a0a1b2e79830bd8c69d5cc495efdb62fac04007c0/68747470733a2f2f63646e2e73766172756e2e6465762f67682f616374696f6e732e706e67\", \"attachments\": [{\"author_name\": \"hamcall.dev\", \"title\": \"build result: ${{ job.status }}\", \"title_link\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\", \"text\": \"Updated ${{steps.run_hamcall.outputs.updated-records}} records in ${{steps.run_hamcall.outputs.run-time}}\"}]}" ${{ secrets.DISCORD_WEBHOOK }}
+          curl -X POST --data-urlencode "payload={\"username\": \"Github Actions\", \"icon_url\": \"https://camo.githubusercontent.com/eeb25c8fe7d597494949032a0a1b2e79830bd8c69d5cc495efdb62fac04007c0/68747470733a2f2f63646e2e73766172756e2e6465762f67682f616374696f6e732e706e67\", \"attachments\": [{\"author_name\": \"hamcall.dev\", \"title\": \"weekly full update result: ${{ job.status }}\", \"title_link\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\", \"text\": \"Full weekly update completed - Updated ${{steps.run_hamcall.outputs.updated-records}} records in ${{steps.run_hamcall.outputs.run-time}}\"}]}" ${{ secrets.DISCORD_WEBHOOK }}
