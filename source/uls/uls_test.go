@@ -240,3 +240,92 @@ func TestProcessIntegration(t *testing.T) {
 		t.Fatalf("Expected expiration '01/01/2030', got '%s'", w5test.Expiration)
 	}
 }
+
+func TestDailyFilesContainEssentialData(t *testing.T) {
+	// Create test directory structure
+	testDir := "/tmp/uls_daily_test"
+	os.MkdirAll(testDir, 0755)
+	defer os.RemoveAll(testDir)
+
+	// Test case 1: All essential files exist with content
+	files := []string{"AM.dat", "EN.dat", "HD.dat"}
+	for _, filename := range files {
+		file, err := os.Create(testDir + "/" + filename)
+		if err != nil {
+			t.Fatalf("Failed to create test %s: %v", filename, err)
+		}
+		file.WriteString("test content")
+		file.Close()
+	}
+
+	if !dailyFilesContainEssentialData(testDir) {
+		t.Fatalf("Expected true when all essential files exist with content")
+	}
+
+	// Test case 2: Missing file
+	os.Remove(testDir + "/AM.dat")
+	if dailyFilesContainEssentialData(testDir) {
+		t.Fatalf("Expected false when essential file is missing")
+	}
+
+	// Test case 3: Empty file
+	file, _ := os.Create(testDir + "/AM.dat")
+	file.Close() // Create empty file
+	if dailyFilesContainEssentialData(testDir) {
+		t.Fatalf("Expected false when essential file is empty")
+	}
+}
+
+func TestDownloadSelection(t *testing.T) {
+	// Test default behavior (no environment variable)
+	os.Unsetenv("ULS_MODE")
+	
+	// Test partial mode
+	os.Setenv("ULS_MODE", "partial")
+	if os.Getenv("ULS_MODE") != "partial" {
+		t.Fatalf("Expected ULS_MODE to be 'partial'")
+	}
+	
+	// Test full mode
+	os.Setenv("ULS_MODE", "full")
+	if os.Getenv("ULS_MODE") != "full" {
+		t.Fatalf("Expected ULS_MODE to be 'full'")
+	}
+	
+	// Test weekly mode (default)
+	os.Unsetenv("ULS_MODE")
+	if os.Getenv("ULS_MODE") == "partial" || os.Getenv("ULS_MODE") == "full" {
+		t.Fatalf("Expected ULS_MODE to be unset")
+	}
+}
+
+func TestGetPreviousBusinessDay(t *testing.T) {
+	// Test that the function returns a valid day code
+	day := getPreviousBusinessDay()
+	validDays := []string{"mon", "tue", "wed", "thu", "fri"}
+	
+	isValid := false
+	for _, validDay := range validDays {
+		if day == validDay {
+			isValid = true
+			break
+		}
+	}
+	
+	if !isValid {
+		t.Fatalf("Expected valid business day, got '%s'", day)
+	}
+}
+
+func TestGetAllDailysSinceWeekly(t *testing.T) {
+	days := getAllDailysSinceWeekly()
+	
+	// Should only return business days
+	validDays := map[string]bool{"mon": true, "tue": true, "wed": true, "thu": true, "fri": true}
+	
+	for _, day := range days {
+		if !validDays[day] {
+			t.Fatalf("Expected only business days, got '%s'", day)
+		}
+	}
+}

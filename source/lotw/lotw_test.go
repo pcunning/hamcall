@@ -41,7 +41,7 @@ N0DEF,2023-02-28,2023-02-28`
 
 	// Test processing
 	calls := make(map[string]data.HamCall)
-	Process(&calls)
+	Process(&calls, false)
 
 	// Verify results - should be 4 calls (3 real + 1 header)
 	if len(calls) != 4 {
@@ -126,7 +126,7 @@ W5TEST,2023-01-15,2023-01-15`
 	}
 
 	// Test processing
-	Process(&calls)
+	Process(&calls, false)
 
 	// Verify results - should have 2 calls (1 existing + 1 header)
 	if len(calls) != 2 {
@@ -162,7 +162,7 @@ func TestLotwProcessMissingFile(t *testing.T) {
 	calls := make(map[string]data.HamCall)
 	
 	// This should not panic or error, just return without processing
-	Process(&calls)
+	Process(&calls, false)
 	
 	// Should have no calls since file doesn't exist
 	if len(calls) != 0 {

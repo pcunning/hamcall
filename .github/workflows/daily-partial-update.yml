@@ -1,0 +1,35 @@
+name: Daily Partial Data Update
+
+on:
+  schedule:
+    # Run partial updates Wednesday through Sunday at midnight UTC
+    # https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows
+    - cron: "0 0 * * 3-7"
+  workflow_dispatch:
+
+jobs:
+  partial-update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download latest hamcall binary
+        run: |
+          # Get the latest release
+          LATEST_RELEASE=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases" | jq -r 'map(select(.draft == false)) | sort_by(.published_at) | last | .tag_name')
+          echo "Latest release: $LATEST_RELEASE"
+          
+          # Download the binary
+          curl -L -o hamcall "https://github.com/${{ github.repository }}/releases/download/$LATEST_RELEASE/hamcall"
+          chmod +x hamcall
+
+      - name: Run hamcall in partial mode
+        id: run_hamcall_partial
+        run: ./hamcall -dl -m=b2
+        env:
+          B2_KEYID: ${{ secrets.B2_KEYID }}
+          B2_APPKEY: ${{ secrets.B2_APPKEY }}
+          GEO_URL: ${{ secrets.GEO_URL }}
+          ULS_MODE: partial
+
+      - name: Send workflow notification
+        run: |
+          curl -X POST --data-urlencode "payload={\"username\": \"Github Actions\", \"icon_url\": \"https://camo.githubusercontent.com/eeb25c8fe7d597494949032a0a1b2e79830bd8c69d5cc495efdb62fac04007c0/68747470733a2f2f63646e2e73766172756e2e6465762f67682f616374696f6e732e706e67\", \"attachments\": [{\"author_name\": \"hamcall.dev\", \"title\": \"daily partial update result: ${{ job.status }}\", \"title_link\": \"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\", \"text\": \"Partial update completed - Updated ${{steps.run_hamcall_partial.outputs.updated-records}} records in ${{steps.run_hamcall_partial.outputs.run-time}}\"}]}" ${{ secrets.DISCORD_WEBHOOK }}

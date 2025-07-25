@@ -40,7 +40,7 @@ func TestRadioIdProcess(t *testing.T) {
 
 	// Test processing
 	calls := make(map[string]data.HamCall)
-	Process(&calls)
+	Process(&calls, false)
 
 	// Verify results
 	if len(calls) != 3 {
@@ -126,7 +126,7 @@ func TestRadioIdProcessWithExistingCalls(t *testing.T) {
 	}
 
 	// Test processing
-	Process(&calls)
+	Process(&calls, false)
 
 	// Verify results - should have 1 call with multiple DMRIDs
 	if len(calls) != 1 {
@@ -189,7 +189,7 @@ func TestRadioIdProcessInvalidID(t *testing.T) {
 
 	// Test processing
 	calls := make(map[string]data.HamCall)
-	Process(&calls)
+	Process(&calls, false)
 
 	// Should only process the valid record
 	if len(calls) != 1 {
@@ -224,7 +224,7 @@ func TestRadioIdProcessMissingFile(t *testing.T) {
 	calls := make(map[string]data.HamCall)
 	
 	// This should not panic or error, just return without processing
-	Process(&calls)
+	Process(&calls, false)
 	
 	// Should have no calls since file doesn't exist
 	if len(calls) != 0 {

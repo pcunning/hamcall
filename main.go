@@ -99,11 +99,14 @@ func downloadFiles() {
 }
 
 func process(calls *map[string]data.HamCall) {
+	ulsMode := os.Getenv("ULS_MODE")
+	partialMode := ulsMode == "partial"
+	
 	uls.Process(calls)
 	ised.Process(calls, "ised_data/amateur_delim.txt")
-	radioid.Process(calls)
-	lotw.Process(calls)
-	geo.Process(calls)
+	radioid.Process(calls, partialMode)
+	lotw.Process(calls, partialMode)
+	geo.Process(calls, partialMode)
 }
 
 func writeToB2(calls *map[string]data.HamCall, keyID, applicationKey string, uploadWorkers int, osSigExit chan bool, dryRun bool) {
