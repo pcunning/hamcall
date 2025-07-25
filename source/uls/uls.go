@@ -27,9 +27,17 @@ func Download(wg *sync.WaitGroup) error {
 		go DownloadDailyLicenses(wg)
 		go DownloadDailyApplications(wg)
 	case "full":
-		wg.Add(4)
-		go DownloadLicenses(wg)
-		go DownloadApplications(wg)
+		// First download weekly files, then daily files to avoid overwriting merged data
+		weeklyWg := &sync.WaitGroup{}
+		weeklyWg.Add(2)
+		go DownloadLicenses(weeklyWg)
+		go DownloadApplications(weeklyWg)
+
+		// Wait for weekly downloads to complete before starting daily downloads
+		weeklyWg.Wait()
+
+		// Now download and merge daily files
+		wg.Add(2)
 		go DownloadDailyLicenses(wg)
 		go DownloadDailyApplications(wg)
 	default:
@@ -86,11 +94,11 @@ func DownloadApplications(wg *sync.WaitGroup) error {
 // Daily files are published the day after, so Monday's file is available on Tuesday after noon
 func getPreviousBusinessDay() string {
 	now := time.Now()
-	
+
 	// Get yesterday's day
 	yesterday := now.AddDate(0, 0, -1)
 	dayOfWeek := yesterday.Weekday()
-	
+
 	// Handle weekends - if yesterday was Sunday or Saturday, get Friday
 	switch dayOfWeek {
 	case time.Sunday:
@@ -100,7 +108,7 @@ func getPreviousBusinessDay() string {
 		// Yesterday was Saturday, get Friday's file (1 day back)
 		yesterday = yesterday.AddDate(0, 0, -1)
 	}
-	
+
 	// Convert to 3-letter lowercase day code
 	day := yesterday.Format("Mon")
 	return strings.ToLower(day[:3])
@@ -111,14 +119,14 @@ func getPreviousBusinessDay() string {
 func getAllDailysSinceWeekly() []string {
 	var days []string
 	now := time.Now()
-	
+
 	// Find the most recent Sunday (when weekly was published)
 	daysBack := int(now.Weekday())
 	if daysBack == 0 {
 		daysBack = 7 // If today is Sunday, go back to previous Sunday
 	}
 	lastSunday := now.AddDate(0, 0, -daysBack)
-	
+
 	// Collect all business days from Monday after last Sunday to yesterday
 	for d := lastSunday.AddDate(0, 0, 1); d.Before(now); d = d.AddDate(0, 0, 1) {
 		if d.Weekday() != time.Saturday && d.Weekday() != time.Sunday {
@@ -126,7 +134,7 @@ func getAllDailysSinceWeekly() []string {
 			days = append(days, strings.ToLower(dayStr[:3]))
 		}
 	}
-	
+
 	return days
 }
 func DownloadDailyLicenses(wg *sync.WaitGroup) error {
@@ -134,7 +142,7 @@ func DownloadDailyLicenses(wg *sync.WaitGroup) error {
 
 	ulsMode := os.Getenv("ULS_MODE")
 	var daysToDownload []string
-	
+
 	if ulsMode == "full" {
 		fmt.Println("Downloading ULS Daily License data (full mode - all dailies since weekly)")
 		daysToDownload = getAllDailysSinceWeekly()
@@ -199,7 +207,7 @@ func DownloadDailyApplications(wg *sync.WaitGroup) error {
 
 	ulsMode := os.Getenv("ULS_MODE")
 	var daysToDownload []string
-	
+
 	if ulsMode == "full" {
 		fmt.Println("Downloading ULS Daily Application data (full mode - all dailies since weekly)")
 		daysToDownload = getAllDailysSinceWeekly()
@@ -256,10 +264,10 @@ func mergeDailyFiles(baseDir string, days []string, fileType string) error {
 	if fileType == "application" {
 		essentialFiles = []string{"EN.dat", "HS.dat"}
 	}
-	
+
 	for _, filename := range essentialFiles {
 		baseFile := baseDir + "/" + filename
-		
+
 		// Open base file for appending
 		baseFileHandle, err := os.OpenFile(baseFile, os.O_APPEND|os.O_WRONLY, 0644)
 		if err != nil {
@@ -267,21 +275,21 @@ func mergeDailyFiles(baseDir string, days []string, fileType string) error {
 			continue
 		}
 		defer baseFileHandle.Close()
-		
+
 		// Append each daily file
 		for _, day := range days {
 			dailyFile := fmt.Sprintf("%s_daily_%s/%s", baseDir, day, filename)
-			
+
 			dailyFileHandle, err := os.Open(dailyFile)
 			if err != nil {
 				fmt.Printf("Warning: Could not open daily file %s: %v\n", dailyFile, err)
 				continue
 			}
-			
+
 			// Copy daily file content to base file
 			_, err = io.Copy(baseFileHandle, dailyFileHandle)
 			dailyFileHandle.Close()
-			
+
 			if err != nil {
 				fmt.Printf("Warning: Could not merge daily file %s: %v\n", dailyFile, err)
 			} else {
@@ -289,21 +297,21 @@ func mergeDailyFiles(baseDir string, days []string, fileType string) error {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
 func dailyFilesContainEssentialData(dir string) bool {
 	// Check if essential files exist and have content
 	essentialFiles := []string{"AM.dat", "EN.dat", "HD.dat"}
-	
+
 	for _, filename := range essentialFiles {
 		filepath := dir + "/" + filename
 		if _, err := os.Stat(filepath); os.IsNotExist(err) {
 			fmt.Printf("Essential file %s missing from daily download\n", filename)
 			return false
 		}
-		
+
 		// Check if file has content
 		info, err := os.Stat(filepath)
 		if err != nil || info.Size() == 0 {
@@ -311,7 +319,7 @@ func dailyFilesContainEssentialData(dir string) bool {
 			return false
 		}
 	}
-	
+
 	return true
 }
 
