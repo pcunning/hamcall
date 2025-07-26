@@ -4,7 +4,7 @@ on:
   schedule:
     # Run partial updates Wednesday through Sunday at midnight UTC
     # https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows
-    - cron: "0 0 * * 3-7"
+    - cron: "0 16 * * 2-6"
   workflow_dispatch:
 
 jobs:
