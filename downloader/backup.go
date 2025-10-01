@@ -78,26 +78,30 @@ func FetchWithBackup(localFile, primaryURL, backupFile string, backup *BackupDow
 	// Try primary download first
 	err := FetchHttp(localFile, primaryURL)
 	if err == nil {
-		// Primary succeeded, upload to backup
+		// Primary succeeded, upload to backup if backup system is available
 		if backup != nil {
 			if uploadErr := backup.UploadBackup(localFile, backupFile); uploadErr != nil {
 				fmt.Printf("Warning: Failed to upload %s to backup: %v\n", backupFile, uploadErr)
+			} else {
+				fmt.Printf("Successfully backed up %s to B2\n", backupFile)
 			}
 		}
 		return nil
 	}
 
-	// Primary failed, try backup
+	// Primary failed, try backup if available
+	fmt.Printf("Primary download failed for %s: %v\n", localFile, err)
 	if backup != nil {
-		fmt.Printf("Primary download failed for %s, trying backup...\n", localFile)
+		fmt.Printf("Attempting to download %s from backup...\n", localFile)
 		if backupErr := backup.DownloadBackup(backupFile, localFile); backupErr == nil {
-			fmt.Printf("Successfully downloaded %s from backup\n", localFile)
+			fmt.Printf("Successfully restored %s from backup\n", localFile)
 			return nil
 		} else {
 			fmt.Printf("Backup download also failed for %s: %v\n", localFile, backupErr)
+			return backupErr
 		}
 	}
 
-	// Both primary and backup failed
+	// Primary failed and no backup system available
 	return err
 }

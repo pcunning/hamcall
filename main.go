@@ -88,7 +88,7 @@ func main() {
 func downloadFiles(keyID, applicationKey string) {
 	var wg sync.WaitGroup
 
-	// Create backup downloader if configured
+	// Create backup downloader if B2 credentials and backup path are configured
 	backupPath := os.Getenv("BACKUP_PATH")
 	var backup *downloader.BackupDownloader
 	if backupPath != "" && keyID != "" && applicationKey != "" {
@@ -96,33 +96,39 @@ func downloadFiles(keyID, applicationKey string) {
 		backup, err = downloader.NewBackupDownloader(keyID, applicationKey, backupPath)
 		if err != nil {
 			fmt.Printf("Warning: Failed to initialize backup downloader: %v\n", err)
+			fmt.Printf("Continuing without backup system - downloads will not be resilient\n")
 			backup = nil
 		} else {
 			fmt.Printf("Backup system enabled with path: %s\n", backupPath)
 		}
+	} else {
+		fmt.Printf("Backup system not configured (set BACKUP_PATH, B2_KEYID, B2_APPKEY to enable)\n")
 	}
 
 	wg.Add(5)
 
+	// ULS is critical - must succeed
 	go uls.Download(&wg)
+	
+	// Secondary services - try primary, fallback to backup if available
 	go func() {
 		if _, err := ised.Download(&wg, backup); err != nil {
-			fmt.Printf("Continuing without ISED data due to download failure\n")
+			fmt.Printf("Warning: Continuing without ISED data\n")
 		}
 	}()
 	go func() {
 		if err := radioid.Download(&wg, backup); err != nil {
-			fmt.Printf("Continuing without RadioID data due to download failure\n")
+			fmt.Printf("Warning: Continuing without RadioID data\n")
 		}
 	}()
 	go func() {
 		if err := lotw.Download(&wg, backup); err != nil {
-			fmt.Printf("Continuing without LOTW data due to download failure\n")
+			fmt.Printf("Warning: Continuing without LOTW data\n")
 		}
 	}()
 	go func() {
 		if err := geo.Download(&wg, backup); err != nil {
-			fmt.Printf("Continuing without GEO data due to download failure\n")
+			fmt.Printf("Warning: Continuing without GEO data\n")
 		}
 	}()
 
