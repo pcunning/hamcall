@@ -20,6 +20,7 @@ import (
 	"github.com/manifoldco/promptui"
 	"github.com/pcunning/hamcall/b2"
 	"github.com/pcunning/hamcall/data"
+	"github.com/pcunning/hamcall/downloader"
 	"github.com/pcunning/hamcall/source/geo"
 	"github.com/pcunning/hamcall/source/ised"
 	"github.com/pcunning/hamcall/source/lotw"
@@ -50,7 +51,7 @@ func main() {
 	uploadWorkers := 200
 
 	if *downloadDataFiles {
-		downloadFiles()
+		downloadFiles(keyID, applicationKey)
 		fmt.Printf("download finished at %s\n", time.Since(start).String())
 
 	} else {
@@ -84,16 +85,52 @@ func main() {
 	fmt.Printf("total runtime %s\n", time.Since(start).String())
 }
 
-func downloadFiles() {
+func downloadFiles(keyID, applicationKey string) {
 	var wg sync.WaitGroup
+
+	// Create backup downloader if B2 credentials and backup path are configured
+	backupPath := os.Getenv("BACKUP_PATH")
+	var backup *downloader.BackupDownloader
+	if backupPath != "" && keyID != "" && applicationKey != "" {
+		var err error
+		backup, err = downloader.NewBackupDownloader(keyID, applicationKey, backupPath)
+		if err != nil {
+			fmt.Printf("Warning: Failed to initialize backup downloader: %v\n", err)
+			fmt.Printf("Continuing without backup system - downloads will not be resilient\n")
+			backup = nil
+		} else {
+			fmt.Printf("Backup system enabled with path: %s\n", backupPath)
+		}
+	} else {
+		fmt.Printf("Backup system not configured (set BACKUP_PATH, B2_KEYID, B2_APPKEY to enable)\n")
+	}
 
 	wg.Add(5)
 
+	// ULS is critical - must succeed
 	go uls.Download(&wg)
-	go ised.Download(&wg)
-	go radioid.Download(&wg)
-	go lotw.Download(&wg)
-	go geo.Download(&wg)
+	
+	// Secondary services - try primary, fallback to backup if available
+	go func() {
+		if _, err := ised.Download(&wg, backup); err != nil {
+			fmt.Printf("Warning: Continuing without ISED data\n")
+		}
+	}()
+	go func() {
+		if err := radioid.Download(&wg, backup); err != nil {
+			fmt.Printf("Warning: Continuing without RadioID data\n")
+		}
+	}()
+	go func() {
+		if err := lotw.Download(&wg, backup); err != nil {
+			fmt.Printf("Warning: Continuing without LOTW data\n")
+		}
+	}()
+	go func() {
+		if err := geo.Download(&wg, backup); err != nil {
+			fmt.Printf("Warning: Continuing without GEO data\n")
+		}
+	}()
 
 	wg.Wait()
 }

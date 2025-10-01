@@ -4,7 +4,6 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"strconv"
 	"sync"
@@ -14,12 +13,20 @@ import (
 	"github.com/pcunning/hamcall/downloader"
 )
 
-func Download(wg *sync.WaitGroup) error {
+func Download(wg *sync.WaitGroup, backup *downloader.BackupDownloader) error {
 	defer wg.Done()
 	fmt.Println("Downloading radioid data")
-	err := downloader.FetchHttp("dmrid.dat", "https://www.radioid.net/static/dmrid.dat")
+	
+	var err error
+	if backup != nil {
+		err = downloader.FetchWithBackup("dmrid.dat", "https://www.radioid.net/static/dmrid.dat", "dmrid.dat", backup)
+	} else {
+		err = downloader.FetchHttp("dmrid.dat", "https://www.radioid.net/static/dmrid.dat")
+	}
+	
 	if err != nil {
-		log.Fatalf("Error downloading RadioID data: %v", err)
+		fmt.Printf("Warning: Error downloading RadioID data: %v\n", err)
+		return err
 	}
 	return nil
 }

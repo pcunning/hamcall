@@ -4,7 +4,6 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"strconv"
 	"sync"
@@ -14,12 +13,20 @@ import (
 	"github.com/pcunning/hamcall/downloader"
 )
 
-func Download(wg *sync.WaitGroup) error {
+func Download(wg *sync.WaitGroup, backup *downloader.BackupDownloader) error {
 	defer wg.Done()
 	fmt.Println("Downloading GEO data")
-	err := downloader.FetchHttp("ham-stations.csv", os.Getenv("GEO_URL"))
+	
+	var err error
+	if backup != nil {
+		err = downloader.FetchWithBackup("ham-stations.csv", os.Getenv("GEO_URL"), "ham-stations.csv", backup)
+	} else {
+		err = downloader.FetchHttp("ham-stations.csv", os.Getenv("GEO_URL"))
+	}
+	
 	if err != nil {
-		log.Fatalf("Error downloading GEO data: %v", err)
+		fmt.Printf("Warning: Error downloading GEO data: %v\n", err)
+		return err
 	}
 	return nil
 }

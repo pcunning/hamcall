@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/pcunning/hamcall/data"
+	"github.com/pcunning/hamcall/downloader"
 )
 
 func TestWebHandler(t *testing.T) {
@@ -130,11 +131,36 @@ func TestProcessFunction(t *testing.T) {
 
 func TestDownloadFilesFunction(t *testing.T) {
 	// Test that downloadFiles function exists and can be referenced
-	// We skip actual execution to avoid network dependencies and log.Fatalf calls
+	// We skip actual execution to avoid network dependencies
 	
 	// Just verify we can reference the function (if we couldn't, this wouldn't compile)
-	_ = downloadFiles
+	_ = func() { downloadFiles("", "") }
 	
-	// Skip actual execution to avoid network dependencies
-	t.Skip("Skipping actual download test to avoid network dependencies and log.Fatalf calls")
+	// Skip actual execution to avoid network dependencies and B2 credentials
+	t.Skip("Skipping actual download test to avoid network dependencies and B2 credentials")
+}
+
+func TestBackupSystemIntegration(t *testing.T) {
+	// Test that backup system is properly integrated without requiring actual network access
+	
+	// Since ULS download will cause log.Fatalf on network failure, we'll just test 
+	// the backup downloader initialization logic in isolation
+	
+	// Test with empty credentials (should disable backup)
+	backup, err := downloader.NewBackupDownloader("", "", "test-path")
+	if err == nil {
+		t.Fatalf("NewBackupDownloader with empty credentials should return error")
+	}
+	if backup != nil {
+		t.Fatalf("NewBackupDownloader with empty credentials should return nil backup")
+	}
+	
+	// Test with empty path (should disable backup)
+	backup2, err2 := downloader.NewBackupDownloader("test-key", "test-app-key", "")
+	if err2 == nil {
+		t.Fatalf("NewBackupDownloader with empty path should return error")
+	}
+	if backup2 != nil {
+		t.Fatalf("NewBackupDownloader with empty path should return nil backup")
+	}
 }
